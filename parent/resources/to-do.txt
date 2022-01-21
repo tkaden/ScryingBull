@@ -1,0 +1,36 @@
+1. Create a file of watchlist items
+2. Create a method that will pull all watchlist items and runs the strat on the from some date to current date
+    - Put that in a "common" file?
+3. Change RSI to WMA
+4. Decouple "common" into a folder for data engineering, sizing, optimizing, etc
+5. Add a folder for "strats" where you would dump models
+6. Add a main folder to pull everything in w/ adjustable parameters
+7. Tie those parameters to a UI?
+
+STUFF TO PUT IN COMMON:
+    Data engineering
+    Analyzers
+    Sizers
+    Optimizers
+
+STRETCH GOALS
+    Auto-populate a watch list with parameters similar to FinViz
+    Write unit tests for the common file & watchlist
+    Marry this to a UI
+
+TOP-DOWN SIGNALS
+    NOT TODAY, SON
+
+STRATS:
+    EMA
+    CCI
+    RSI
+    BollingerBands/BollingerBandsPct (MeanDev'ish')
+    Kinger
+    MeanDeviation
+    LondonBreakout**
+    FibonacciPivotPoint**
+    HullMovingAverage**
+    Ichimoku**
+    KnowSureThing**
+    TripleEMA**
