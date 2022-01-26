@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
+import yfinance as yf
 import backtrader as bt
 from parent.resources import core_constants
 from datetime import datetime
 from pandas.tseries.offsets import BDay
 from parent import main
 import csv
-
-
 
 gen_data = []
 signals = []
@@ -26,8 +25,7 @@ def export_data(strat):
 
         backtrader_df = pd.DataFrame(gen_data)
         backtrader_df.columns = ["Date", "Stock", "NetTrade", "NetProfit"]
-        #backtrader_df.to_csv("S:/git/scryingbull/parent/data_gathering/backtest_data/" + str(strat) + "_" + stock_name + ".csv")
-        backtrader_df.to_csv("C:/Users/User/PycharmProjects/git/scrying_bull/parent/data_gathering/backtest_data/" + str(strat) + "_" + stock_name + ".csv")
+        backtrader_df.to_csv("../parent/data_gathering/backtest_data/" + str(strat) + "_" + stock_name + ".csv")
         del backtrader_df
 
         write_signals(signals)
@@ -63,14 +61,11 @@ def gaining_momentum(dt, name, open):
     signals.append([format(dt), name, open, core_constants.RISING])
 
 def stock_data(stock, to_date, from_date):
-    return bt.feeds.YahooFinanceData(
-        dataname=str(stock.strip()),
-        fromdate=from_date,
-        todate=to_date,
-        buffered=True
+    return bt.feeds.PandasData(
+        yf.download(stock,
+                    start=pd.to_datetime(from_date).tz_localize('CET'),
+                    end=pd.to_datetime(to_date).tz_localize('CET'))
     )
-
-
 
 def filter_signals(signal_list):
     filtered = []

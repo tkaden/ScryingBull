@@ -1,0 +1,6 @@
+backtrader==1.9.76.123
+numpy==1.22.1
+pandas==1.4.0
+six==1.16.0
+requests==2.27.1
+yfinance==0.1.69

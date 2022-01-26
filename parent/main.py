@@ -5,9 +5,9 @@ from parent.resources import core_constants
 from parent.data_gathering import data_processing
 import threading
 
-TESTING = False
+TESTING = True
 
-THREADS = 8
+THREADS = 4
 if TESTING:
     THREADS = 1
 
@@ -31,9 +31,10 @@ def main():
     startcash = 100000
     today = datetime.today() + relativedelta(days=1)
     first = datetime.today() - relativedelta(years=2)
-    to_date = datetime(today.year, today.month, today.day)
-    from_date = datetime(first.year, first.month, first.day)
+    to_date = str(datetime(today.year, today.month, today.day))
+    from_date = str(datetime(first.year, first.month, first.day))
     stocks = data_processing.pull_watchlist()
+    print("Stocks " + str(stocks))
     chunks = chunk_list(THREADS, stocks)
 
     for chunk in chunks:

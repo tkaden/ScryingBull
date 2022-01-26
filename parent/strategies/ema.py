@@ -49,9 +49,13 @@ class EmaCross(bt.Strategy):
 
 
 def run(stock, startcash, to_date, from_date):
-    try:
+
+        print("Stock" + str(stock))
+        print("Start cash " + str(startcash))
         cerebro = bt.Cerebro()
         cerebro.addstrategy(EmaCross)
+        print("To date " + str(to_date))
+        print("From date " + str(from_date))
         stock_data = data_processing.stock_data(stock, to_date, from_date)
         cerebro.adddata(stock_data)
         cerebro.broker.setcash(startcash)
@@ -64,6 +68,8 @@ def run(stock, startcash, to_date, from_date):
         percent_gain = 0
         if cash != startcash:
             percent_gain = pnl/(startcash-cash)
+        print("Stock 2: "+stock)
+        print("PNL " + pnl)
         csv.writer(core_constants.pnl_file_write).writerow([stock, round(pnl, 2), round(percent_gain*100, 2)])
 
         if main.TESTING:
@@ -71,8 +77,5 @@ def run(stock, startcash, to_date, from_date):
 
         #data_processing.export_data('ema')
         #plot.savefig(filename='C:/Users/User/PycharmProjects/git/scrying_bull/parent/data_gathering/backtest_data/plots/'+str(stock) + '-plot.png')
-
-    except:
-        "Error with stock: "+stock
 
 

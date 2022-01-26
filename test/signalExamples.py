@@ -6,7 +6,6 @@ import datetime  # For datetime objects
 # Import the backtrader platform
 import backtrader as bt
 
-
 # Create a Stratey
 class TestStrategy(bt.Strategy):
     params = (
