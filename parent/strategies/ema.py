@@ -50,12 +50,8 @@ class EmaCross(bt.Strategy):
 
 def run(stock, startcash, to_date, from_date):
 
-        print("Stock" + str(stock))
-        print("Start cash " + str(startcash))
         cerebro = bt.Cerebro()
         cerebro.addstrategy(EmaCross)
-        print("To date " + str(to_date))
-        print("From date " + str(from_date))
         stock_data = data_processing.stock_data(stock, to_date, from_date)
         cerebro.adddata(stock_data)
         cerebro.broker.setcash(startcash)
@@ -74,8 +70,3 @@ def run(stock, startcash, to_date, from_date):
 
         if main.TESTING:
             cerebro.plot(style='line')
-
-        #data_processing.export_data('ema')
-        #plot.savefig(filename='C:/Users/User/PycharmProjects/git/scrying_bull/parent/data_gathering/backtest_data/plots/'+str(stock) + '-plot.png')
-
-

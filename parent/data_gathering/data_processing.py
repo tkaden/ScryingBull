@@ -61,10 +61,11 @@ def gaining_momentum(dt, name, open):
     signals.append([format(dt), name, open, core_constants.RISING])
 
 def stock_data(stock, to_date, from_date):
-    return bt.feeds.PandasData(
-        yf.download(stock,
-                    start=pd.to_datetime(from_date).tz_localize('CET'),
-                    end=pd.to_datetime(to_date).tz_localize('CET'))
+    return bt.feeds.Quandl(
+        dataname=stock,
+        fromdate=from_date,
+        todate=to_date,
+        buffered=True
     )
 
 def filter_signals(signal_list):

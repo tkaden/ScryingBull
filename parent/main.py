@@ -7,7 +7,7 @@ import threading
 
 TESTING = True
 
-THREADS = 4
+THREADS = 8
 if TESTING:
     THREADS = 1
 
@@ -31,10 +31,9 @@ def main():
     startcash = 100000
     today = datetime.today() + relativedelta(days=1)
     first = datetime.today() - relativedelta(years=2)
-    to_date = str(datetime(today.year, today.month, today.day))
-    from_date = str(datetime(first.year, first.month, first.day))
+    to_date = datetime(today.year, today.month, today.day)
+    from_date = datetime(first.year, first.month, first.day)
     stocks = data_processing.pull_watchlist()
-    print("Stocks " + str(stocks))
     chunks = chunk_list(THREADS, stocks)
 
     for chunk in chunks:
