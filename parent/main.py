@@ -5,7 +5,7 @@ from parent.resources import core_constants
 from parent.data_gathering import data_processing
 import threading
 
-TESTING = True
+TESTING = False
 
 THREADS = 8
 if TESTING:
@@ -29,8 +29,8 @@ def run_thread(stocks, startcash, to_date, from_date):
 def main():
     # startcash = core_constants.MAX_CASH
     startcash = 100000
-    today = datetime.today() + relativedelta(days=1)
-    first = datetime.today() - relativedelta(years=2)
+    today = datetime.today() - relativedelta(days=3)
+    first = datetime.today() - relativedelta(years=4)
     to_date = datetime(today.year, today.month, today.day)
     from_date = datetime(first.year, first.month, first.day)
     stocks = data_processing.pull_watchlist()

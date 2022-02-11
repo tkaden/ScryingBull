@@ -11,8 +11,8 @@ class EmaCross(bt.Strategy):
     params = dict(
         base=1,
         fast=5,  # period for the fast moving average
-        mid=5,   # period for the slow moving average
-        slow=190
+        mid=20,   # period for the slow moving average
+        slow=50
     )
 
     def __init__(self):

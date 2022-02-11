@@ -6,6 +6,7 @@ from parent.resources import core_constants
 from datetime import datetime
 from pandas.tseries.offsets import BDay
 from parent import main
+from parent.resources import config
 import csv
 
 gen_data = []
@@ -65,7 +66,8 @@ def stock_data(stock, to_date, from_date):
         dataname=stock,
         fromdate=from_date,
         todate=to_date,
-        buffered=True
+        buffered=True,
+        apikey=config.quandlapi
     )
 
 def filter_signals(signal_list):

@@ -1,1 +1,1 @@
-quandlapi = 'Your API key'
+quandlapi = 'R1lE9ybkvLYYhI5ER2PSpQiQtsYQjBzN'
