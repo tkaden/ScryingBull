@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import requests
 import yfinance as yf
 import backtrader as bt
 from parent.resources import core_constants
@@ -12,6 +13,7 @@ import csv
 gen_data = []
 signals = []
 profits_list = []
+
 
 def export_data(strat):
     profits = 0
@@ -62,12 +64,11 @@ def gaining_momentum(dt, name, open):
     signals.append([format(dt), name, open, core_constants.RISING])
 
 def stock_data(stock, to_date, from_date):
-    return bt.feeds.Quandl(
+    return bt.feeds.YahooFinanceData(
         dataname=stock,
         fromdate=from_date,
         todate=to_date,
-        buffered=True,
-        apikey=config.quandlapi
+        buffered=True
     )
 
 def filter_signals(signal_list):

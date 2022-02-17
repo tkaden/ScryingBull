@@ -4,8 +4,9 @@ from dateutil.relativedelta import relativedelta
 from parent.resources import core_constants
 from parent.data_gathering import data_processing
 import threading
+import requests
 
-TESTING = False
+TESTING = True
 
 THREADS = 8
 if TESTING:

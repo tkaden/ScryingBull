@@ -4,14 +4,16 @@ import backtrader as bt
 from parent.data_gathering import data_processing
 from parent.resources import core_constants
 from parent import main
-
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use('Agg')
 
 class EmaCross(bt.Strategy):
     # list of parameters which are configurable for the strategy
     params = dict(
         base=1,
         fast=5,  # period for the fast moving average
-        mid=20,   # period for the slow moving average
+        mid=20,   # period for the slow moving averag1
         slow=50
     )
 
@@ -65,7 +67,7 @@ def run(stock, startcash, to_date, from_date):
         if cash != startcash:
             percent_gain = pnl/(startcash-cash)
         print("Stock 2: "+stock)
-        print("PNL " + pnl)
+        print("PNL " + str(pnl))
         csv.writer(core_constants.pnl_file_write).writerow([stock, round(pnl, 2), round(percent_gain*100, 2)])
 
         if main.TESTING:
