@@ -66,9 +66,6 @@ def run(stock, startcash, to_date, from_date):
         percent_gain = 0
         if cash != startcash:
             percent_gain = pnl/(startcash-cash)
-        print("Stock 2: "+stock)
-        print("PNL " + str(pnl))
         csv.writer(core_constants.pnl_file_write).writerow([stock, round(pnl, 2), round(percent_gain*100, 2)])
 
-        if main.TESTING:
-            cerebro.plot(style='line')
+        cerebro.plot(style='line')

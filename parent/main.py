@@ -28,17 +28,22 @@ def run_thread(stocks, startcash, to_date, from_date):
     print(round(sum(PROFITS), 2))
 
 def main():
-    # startcash = core_constants.MAX_CASH
     startcash = 100000
-    today = datetime.today() - relativedelta(days=3)
-    first = datetime.today() - relativedelta(years=4)
+    today = datetime.today() - relativedelta(days=1)
+    first = datetime.today() - relativedelta(years=8)
     to_date = datetime(today.year, today.month, today.day)
     from_date = datetime(first.year, first.month, first.day)
     stocks = data_processing.pull_watchlist()
     chunks = chunk_list(THREADS, stocks)
 
-    for chunk in chunks:
-        threading.Thread(target=run_thread, args=(chunk, startcash, to_date, from_date)).start()
+    if TESTING == False:
+        for chunk in chunks:
+            threading.Thread(target=run_thread, args=(chunk, startcash, to_date, from_date)).start()
+    else:
+        ema.run(stocks[0].strip(), startcash, to_date, from_date)
+        for profit in data_processing.profits_list:
+            PROFITS.append(profit)
+        print(round(sum(PROFITS), 2))
 
 
 if __name__ == '__main__':
