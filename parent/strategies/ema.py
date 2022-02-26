@@ -13,8 +13,8 @@ class EmaCross(bt.Strategy):
     params = dict(
         base=1,
         fast=5,  # period for the fast moving average
-        mid=20,   # period for the slow moving averag1
-        slow=50
+        mid=20,   # period for the slow moving average
+        slow=120
     )
 
     def __init__(self):
@@ -33,9 +33,9 @@ class EmaCross(bt.Strategy):
             dt = self.data.datetime.date()
             if self.getposition(d).size == 0:  # not in the market
                 if self.signal > 0:
-                    self.buy(d)
+                    self.buy()
             elif self.signal < 0:
-                    self.close(d)
+                    self.close()
 
             if self.momentum > 0:
                 data_processing.gaining_momentum(dt, dn, d.close)
