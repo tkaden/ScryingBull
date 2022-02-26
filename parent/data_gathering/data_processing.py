@@ -1,14 +1,12 @@
-import pandas as pd
-import numpy as np
-import requests
-import yfinance as yf
-import backtrader as bt
-from parent.resources import core_constants
-from datetime import datetime
-from pandas.tseries.offsets import BDay
-from parent import main
-from parent.resources import config
 import csv
+from datetime import datetime
+
+import backtrader as bt
+import pandas as pd
+from pandas.tseries.offsets import BDay
+
+from parent import main
+from parent.resources import core_constants
 
 gen_data = []
 signals = []
@@ -24,7 +22,7 @@ def export_data(strat):
             profits = profits + trade[2]
             trade.append(round(profits, 2))
 
-        profits_list.append(gen_data[len(gen_data)-1][2])
+        profits_list.append(gen_data[len(gen_data) - 1][2])
 
         backtrader_df = pd.DataFrame(gen_data)
         backtrader_df.columns = ["Date", "Stock", "NetTrade", "NetProfit"]
@@ -36,6 +34,7 @@ def export_data(strat):
 
     else:
         print("No Data")
+
 
 def trade_is_closed(dt, trade):
     data = gen_data
@@ -49,6 +48,7 @@ def trade_is_closed(dt, trade):
     signals.append([format(dt), trade.data._name, val, core_constants.SELL])
     return data
 
+
 def trade_is_open(dt, trade):
     print('{} {} Open: Port value {}'.format(
         dt,
@@ -57,11 +57,14 @@ def trade_is_open(dt, trade):
     val = round(trade.pnl, 2)
     signals.append([format(dt), trade.data._name, val, core_constants.BUY])
 
+
 def losing_momentum(dt, name, open):
     signals.append([format(dt), name, open, core_constants.FALLING])
 
+
 def gaining_momentum(dt, name, open):
     signals.append([format(dt), name, open, core_constants.RISING])
+
 
 def stock_data(stock, to_date, from_date):
     return bt.feeds.YahooFinanceData(
@@ -70,6 +73,7 @@ def stock_data(stock, to_date, from_date):
         todate=to_date,
         buffered=True
     )
+
 
 def filter_signals(signal_list):
     filtered = []
@@ -81,6 +85,7 @@ def filter_signals(signal_list):
         if signal_list[i][0] == buis_day:
             filtered.append(signal_list[i])
     return filtered
+
 
 def write_signals(signals):
     filtered_signals = filter_signals(signals)
@@ -100,11 +105,13 @@ def write_signals(signals):
 
         filtered_signals.clear()
 
+
 def pull_watchlist():
     if main.TESTING:
         return core_constants.WATCHLIST_TEST.readlines()
     else:
         return core_constants.WATCHLIST.readlines()
+
 
 def is_weekday():
     week_num = datetime.today().weekday()

@@ -6,6 +6,7 @@ import datetime  # For datetime objects
 # Import the backtrader platform
 import backtrader as bt
 
+
 # Create a Stratey
 class TestStrategy(bt.Strategy):
     params = (
@@ -91,7 +92,6 @@ class TestStrategy(bt.Strategy):
 
             # Not yet ... we MIGHT BUY if ...
             if self.dataclose[0] > self.sma[0]:
-
                 # BUY, BUY, BUY!!! (with all possible default parameters)
                 self.log('BUY CREATE, %.2f' % self.dataclose[0])
 

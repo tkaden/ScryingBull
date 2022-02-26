@@ -3,7 +3,7 @@ WATCHLIST = open("../parent/resources/watchlist.txt", "r")
 
 WATCHLIST_TEST = open("../parent/resources/watchlist_test.txt", "r")
 
-#Use max cash when wanting to generate signals only
+# Use max cash when wanting to generate signals only
 MAX_CASH = float("inf")
 
 BUY = "Signal Triggered: Buy"

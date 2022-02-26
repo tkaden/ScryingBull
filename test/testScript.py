@@ -1,5 +1,7 @@
-import backtrader as bt
 from datetime import datetime
+
+import backtrader as bt
+
 
 class firstStrategy(bt.Strategy):
 
@@ -15,25 +17,25 @@ class firstStrategy(bt.Strategy):
                 self.sell(size=100)
 
 
-#Variable for our starting cash
+# Variable for our starting cash
 startcash = 10000
 
-#Create an instance of cerebro
+# Create an instance of cerebro
 cerebro = bt.Cerebro()
 
-#Add our strategy
+# Add our strategy
 cerebro.addstrategy(firstStrategy)
 
-#Get Apple data from Yahoo Finance.
+# Get Apple data from Yahoo Finance.
 data = bt.feeds.Quandl(
     dataname='AAPL',
-    fromdate=datetime(2016,1,1),
-    todate=datetime(2017,1,1),
+    fromdate=datetime(2016, 1, 1),
+    todate=datetime(2017, 1, 1),
     buffered=True,
     apikey="a15HDnYHzQj_1GJ-WZrS"
-    )
+)
 
-#Add the data to Cerebro
+# Add the data to Cerebro
 cerebro.adddata(data)
 
 # Set our desired cash start
@@ -42,13 +44,13 @@ cerebro.broker.setcash(startcash)
 # Run over everything
 cerebro.run()
 
-#Get final portfolio Value
+# Get final portfolio Value
 portvalue = cerebro.broker.getvalue()
 pnl = portvalue - startcash
 
-#Print out the final result
+# Print out the final result
 print('Final Portfolio Value: ${}'.format(portvalue))
 print('P/L: ${}'.format(pnl))
 
-#Finally plot the end results
+# Finally plot the end results
 cerebro.plot(style='candlestick')

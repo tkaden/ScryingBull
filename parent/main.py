@@ -1,10 +1,10 @@
-from parent.strategies import cci, rsi, meanDev, ema, klinger
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from parent.resources import core_constants
-from parent.data_gathering import data_processing
 import threading
-import requests
+from datetime import datetime
+
+from dateutil.relativedelta import relativedelta
+
+from parent.data_gathering import data_processing
+from parent.strategies import ema
 
 TESTING = True
 
@@ -15,8 +15,9 @@ if TESTING:
 PROFITS = []
 NET = 0
 
+
 def chunk_list(threads, stock_list):
-    chunk_size = int(len(stock_list)/threads)
+    chunk_size = int(len(stock_list) / threads)
     return [stock_list[i:i + chunk_size] for i in range(0, len(stock_list), chunk_size)]
 
 
@@ -26,6 +27,7 @@ def run_thread(stocks, startcash, to_date, from_date):
         for profit in data_processing.profits_list:
             PROFITS.append(profit)
     print(round(sum(PROFITS), 2))
+
 
 def main():
     startcash = 100000
@@ -44,6 +46,10 @@ def main():
         for profit in data_processing.profits_list:
             PROFITS.append(profit)
         print(round(sum(PROFITS), 2))
+
+
+def lambda_func(event, context):
+    main()
 
 
 if __name__ == '__main__':

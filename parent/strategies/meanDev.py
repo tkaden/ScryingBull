@@ -1,4 +1,5 @@
 import backtrader as bt
+
 from parent.data_gathering import data_processing
 
 
@@ -60,16 +61,17 @@ class BOLLStrat(bt.Strategy):
         else:
             data_processing.trade_is_open(dt, trade)
 
+
 def run(startcash, watchlist, api, to_date, from_date):
-    #Create an instance of cerebro
+    # Create an instance of cerebro
     cerebro = bt.Cerebro()
 
-    #Add our strategy
+    # Add our strategy
     cerebro.addstrategy(BOLLStrat)
 
     stock_list = data_processing.stock_data(watchlist, to_date, from_date)
 
-    #Add the data to Cerebro
+    # Add the data to Cerebro
     for i in stock_list:
         cerebro.adddata(i)
 
@@ -77,15 +79,15 @@ def run(startcash, watchlist, api, to_date, from_date):
     cerebro.broker.setcash(startcash)
     cerebro.run()
 
-    #Get final portfolio Value
+    # Get final portfolio Value
     portvalue = cerebro.broker.getvalue()
     pnl = portvalue - startcash
 
-    #Print out the final result
+    # Print out the final result
     print('Final Portfolio Value: ${}'.format(portvalue))
     print('P/L: ${}'.format(pnl))
 
     data_processing.export_data('meanDev')
 
-    #Finally plot the end results
+    # Finally plot the end results
     cerebro.plot(style='line')

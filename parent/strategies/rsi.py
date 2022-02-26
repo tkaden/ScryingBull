@@ -1,4 +1,5 @@
 import backtrader as bt
+
 from parent.data_gathering import data_processing
 
 
@@ -19,7 +20,7 @@ class rsi(bt.Strategy):
             pos = self.getposition(d).size
             if pos == 0:
                 if self.inds[d]['rsi'] < 30:
-                    self.buy(data=d, size=(10000/d.tick_last))
+                    self.buy(data=d, size=(10000 / d.tick_last))
             elif self.inds[d]['rsi'] > 70:
                 self.close(data=d)
 
@@ -32,15 +33,15 @@ class rsi(bt.Strategy):
 
 
 def run(startcash, watchlist, api, to_date, from_date):
-    #Create an instance of cerebro
+    # Create an instance of cerebro
     cerebro = bt.Cerebro()
 
-    #Add our strategy
+    # Add our strategy
     cerebro.addstrategy(rsi)
 
     stock_list = data_processing.stock_data(watchlist, to_date, from_date)
 
-    #Add the data to Cerebro
+    # Add the data to Cerebro
     for i in stock_list:
         cerebro.adddata(i)
 
@@ -48,15 +49,15 @@ def run(startcash, watchlist, api, to_date, from_date):
     cerebro.broker.setcash(startcash)
     cerebro.run()
 
-    #Get final portfolio Value
+    # Get final portfolio Value
     portvalue = cerebro.broker.getvalue()
     pnl = portvalue - startcash
 
-    #Print out the final result
+    # Print out the final result
     print('Final Portfolio Value: ${}'.format(portvalue))
     print('P/L: ${}'.format(pnl))
 
     data_processing.export_data('rsi')
 
-    #Finally plot the end results
+    # Finally plot the end results
     cerebro.plot(style='line')
