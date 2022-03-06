@@ -11,36 +11,20 @@ phases:
       - . test_venv/bin/activate
       - pip install --upgrade pip
       #- pip install .
-      - pip install -r req.txt
-      - rm -rf dspt
-      - mkdir test-reports
+      #- mkdir test-reports
   build:
     commands:
-      - pytest 
-        --html=test-reports/report.html 
-        --self-contained-html
-        -s
-        -v
-        --cov=dspt 
-        --cov-report=html:test-reports/coverage 
-        --junitxml=test-reports/junit.xml 
-        --log-file=test-reports/logs.txt 
-        tests
+      - pip install -r req.txt
+      - rm -rf dspt
   post_build:
     commands:
       - echo Build completed on `date`
 
-reports:
-  coverage:
-    files:
-      - "coverage/*"
-    base-directory: 'test-reports'
-    discard-paths: yes
-  report:
-    files:
-      - 'junit.xml'
-      - 'report.html'
-      - 'assets/*'
-    base-directory: 'test-reports'
-    discard-paths: yes
-    file-format: JunitXml
+artifacts:
+  files:
+    - packaged.yaml
+  discard-paths: yes
+
+cache:
+  paths:
+    - '/root/.cache/pip'
