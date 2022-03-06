@@ -129,5 +129,5 @@ dmypy.json
 .pyre/
 
 # In project files
-parent/resources/config.py
+src/resources/config.py
 .DS_Store

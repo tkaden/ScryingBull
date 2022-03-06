@@ -118,7 +118,7 @@ if __name__ == '__main__':
     # Datas are in a subfolder of the samples. Need to find where the script is
     # because it could have been called from anywhere
 
-    f = open("S:/git/WMASignal/parent/resources/watchlist.txt", "r")
+    f = open("S:/git/WMASignal/src/resources/watchlist.txt", "r")
     stocks = f.readlines()
     stock_list = []
 
