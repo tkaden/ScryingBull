@@ -1,5 +1,9 @@
 # Scrying Bull
 
+## NOTE: this repo is no longer being worked on. Lessons learned from this project will be translated to repo AlgoTrading which will be more flexible.
+## AlgoTrading will have more of a focus on backtesting custom, unique strategies instead of optimizing strategy parameters from the BackTrader library.
+## AlgoTrading's goal is to be it's own package for people to explore my strategies.
+
 Scrying Bull is a play on the term 'Scrying Bowl', a tool used by fortune-tellers to gain insights or clairvoyance.
 
 This application works as a platform to easily develop and back-test trading strategies on a list of stocks. This gives
