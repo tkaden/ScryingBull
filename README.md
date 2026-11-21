@@ -62,6 +62,7 @@ python3 -m http.server -d site               # view it at http://localhost:8000
 
 ./target/release/scry daily                  # fetch + backtest + paper + site in one go
 ./target/release/scry list                   # every strategy id and description
+./target/release/scry analyze volatility.vol_target.20.0.15   # deep-dive tables for one strategy
 ```
 
 Configuration lives in `scry.toml`: universe, dates, starting cash and trading costs.
@@ -195,6 +196,7 @@ src/
   paper.rs       append-only paper ledger
   metrics.rs     CAGR, Sharpe, Sortino, drawdown, yearly returns
   site.rs        static site generator (assets in web/)
+  analyze.rs     per-strategy deep dive: curves, drawdowns, parameter grid, cost and universe stress tests
   broker.rs      Alpaca REST client behind a `Broker` trait
   live.rs        mirror paper accounts into a broker account, with guardrails
 ```

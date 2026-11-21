@@ -6,6 +6,7 @@
 // Numeric code indexes several parallel arrays at once; ranges read better there.
 #![allow(clippy::needless_range_loop)]
 
+pub mod analyze;
 pub mod backtest;
 pub mod broker;
 pub mod config;

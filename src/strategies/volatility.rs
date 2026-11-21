@@ -111,8 +111,9 @@ impl SymbolStrategy for NarrowRange {
 
 pub fn specs() -> Vec<Spec> {
     let mut v = Vec::new();
-    for n in [20, 60] {
-        for t in [0.10, 0.15, 0.20] {
+    // A full grid so robustness to the parameters can be checked.
+    for n in [10, 20, 40, 60, 120] {
+        for t in [0.05, 0.10, 0.15, 0.20, 0.25] {
             v.push(Spec::per_symbol(
                 format!("volatility.vol_target.{n}.{t}"),
                 "volatility",

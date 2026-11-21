@@ -24,6 +24,10 @@ pub struct Config {
     pub cash: f64,
     pub costs: Costs,
     pub universe: Vec<String>,
+    /// Optional second universe for robustness checks in `scry analyze`
+    /// (e.g. ETFs only, which has no hindsight stock picking).
+    #[serde(default)]
+    pub robustness_universe: Vec<String>,
     /// Optional: mirror strategies into a broker account.
     #[serde(default)]
     pub live: Option<LiveConfig>,

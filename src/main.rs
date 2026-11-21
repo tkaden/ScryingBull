@@ -72,6 +72,13 @@ enum Cmd {
         #[arg(long)]
         real_money: bool,
     },
+    /// Deep-dive analytics for one strategy (JSON tables for dashboards).
+    Analyze {
+        /// Strategy id, e.g. volatility.vol_target.20.0.15
+        id: String,
+        #[arg(long, default_value = "results/analysis")]
+        out: PathBuf,
+    },
     /// Rank strategies by their *paper* record, to choose what to trade live.
     Candidates {
         #[arg(long, default_value = "ledger/ledger.json")]
@@ -128,6 +135,26 @@ fn main() -> Result<()> {
             execute,
             real_money,
         } => run_live(&cfg, &ledger, &state, execute, real_money),
+        Cmd::Analyze { id, out } => {
+            let panel = load_panel(&cfg)?;
+            let alt = if cfg.robustness_universe.is_empty() {
+                None
+            } else {
+                Some(Panel::load(
+                    &cfg.data_dir,
+                    &cfg.robustness_universe,
+                    cfg.data_start,
+                )?)
+            };
+            scrying_bull::analyze::analyze(
+                &cfg,
+                &panel,
+                alt.as_ref(),
+                &registry(),
+                &id,
+                &out.join(&id),
+            )
+        }
         Cmd::Candidates {
             ledger,
             min_days,

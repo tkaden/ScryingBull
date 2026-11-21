@@ -26,6 +26,15 @@ universe = [
   "PG", "KO", "WMT", "HD", "UNH", "V", "BRK-B", "CAT", "COST",
 ]
 
+# `scry analyze` re-tests a strategy on this universe too. ETFs only: no
+# single stocks chosen with hindsight, so no survivorship bias from the list.
+robustness_universe = [
+  "SPY", "QQQ", "IWM", "DIA", "EFA", "EEM",
+  "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB",
+  "TLT", "IEF", "SHY", "LQD", "HYG",
+  "GLD", "SLV", "DBC", "USO", "VNQ",
+]
+
 [costs]
 commission_bps = 1.0  # per side, basis points of notional
 slippage_bps = 5.0    # adverse fill vs. the open

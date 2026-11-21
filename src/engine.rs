@@ -167,6 +167,8 @@ pub struct Run {
     pub book: Book,
     /// Average gross exposure over the evaluation window.
     pub avg_exposure: f64,
+    /// Gross exposure (sum of |weights|) at each recorded close.
+    pub exposure: Vec<f64>,
 }
 
 /// Simulate `strategy` over `panel`. The strategy is fed every bar (warm-up
@@ -182,7 +184,7 @@ pub fn simulate(
     let mut book = Book::new(cash, n);
     let mut w = vec![f64::NAN; n];
     let mut equity = Vec::new();
-    let mut expo = 0.0;
+    let mut exposure = Vec::new();
     let mut started = false;
     for (t, date) in panel.dates.iter().enumerate() {
         let bars = &panel.bars[t];
@@ -196,21 +198,18 @@ pub fn simulate(
         let eq = book.mark(bars);
         if started {
             equity.push((*date, eq));
-            expo += book.weights().iter().map(|x| x.abs()).sum::<f64>();
+            exposure.push(book.weights().iter().map(|x| x.abs()).sum::<f64>());
         }
         w.fill(f64::NAN);
         strategy.next(*date, bars, &mut w);
         book.set_targets(&w);
     }
-    let avg_exposure = if equity.is_empty() {
-        0.0
-    } else {
-        expo / equity.len() as f64
-    };
+    let avg_exposure = exposure.iter().sum::<f64>() / exposure.len().max(1) as f64;
     Run {
         equity,
         book,
         avg_exposure,
+        exposure,
     }
 }
 
