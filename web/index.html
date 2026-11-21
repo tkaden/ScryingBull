@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scrying Bull</title>
+<meta name="description" content="Hundreds of very different trading strategies, backtested and paper traded side by side.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="wrap">
+  <h1>Scrying Bull</h1>
+  <p class="sub">Hundreds of very different trading methods, backtested and paper traded side by side, updated every market day.</p>
+  <p id="banner" class="banner" hidden></p>
+  <div id="tiles" class="tiles"></div>
+</header>
+
+<main class="wrap">
+  <section class="filters" aria-label="Filters">
+    <label>Family <select id="family"><option value="">All families</option></select></label>
+    <label class="grow">Search <input id="search" type="search" placeholder="e.g. rsi, knn, donchian"></label>
+    <label class="check"><input id="hideRandom" type="checkbox" checked> Hide random baselines</label>
+  </section>
+
+  <section class="card">
+    <h2>Backtest Sharpe by family</h2>
+    <p class="note">Each dot is one strategy. The shaded band is the 5th–95th percentile of 20 <em>random</em> strategies, so anything inside it hasn't beaten luck. The dashed line is buy &amp; hold. Click a dot for details.</p>
+    <div id="strip" class="chart"></div>
+  </section>
+
+  <section class="card">
+    <h2>Does the backtest predict the paper results?</h2>
+    <p class="note">Backtest Sharpe vs. live paper Sharpe. If backtests were reliable, dots would line up on the diagonal. Most overfit strategies collapse toward zero once trading forward.</p>
+    <div id="scatter" class="chart"></div>
+  </section>
+
+  <section class="card" id="detail" hidden>
+    <div class="detail-head">
+      <div>
+        <h2 id="d-title"></h2>
+        <p id="d-desc" class="note"></p>
+      </div>
+      <button id="d-close" type="button" aria-label="Close details">Close</button>
+    </div>
+    <div id="d-stats" class="stats"></div>
+    <h3>Backtest equity <span class="muted">(growth of $1)</span></h3>
+    <div id="d-bt" class="chart"></div>
+    <h3>Paper trading equity <span class="muted">(growth of $1)</span></h3>
+    <div id="d-paper" class="chart"></div>
+    <h3>Calendar-year returns</h3>
+    <div id="d-years" class="years"></div>
+  </section>
+
+  <section class="card">
+    <h2>Leaderboard</h2>
+    <p class="note">Click a column to sort, a row for details. Backtest columns cover <span id="bt-range"></span>; paper columns start when each strategy was first added to the ledger.</p>
+    <div class="table-wrap">
+      <table id="table">
+        <thead><tr>
+          <th data-k="id" class="l">Strategy</th>
+          <th data-k="family" class="l">Family</th>
+          <th data-k="bt.cagr">CAGR</th>
+          <th data-k="bt.sharpe">Sharpe</th>
+          <th data-k="bt.mdd">Max DD</th>
+          <th data-k="bt.ret1y">1y return</th>
+          <th data-k="bt.beats_random" title="Share of random baseline strategies with a lower Sharpe">Beats random</th>
+          <th data-k="paper.ret">Paper return</th>
+          <th data-k="paper.sharpe">Paper Sharpe</th>
+          <th data-k="paper.days">Paper days</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="note">
+    <p>Fills at the next day's open after each signal, with <span id="costs"></span>. Universe: <span id="universe"></span>.
+    Not investment advice. With hundreds of strategies tested, the best backtests are expected to be lucky; the paper record is the honest test.</p>
+    <p>Generated <span id="generated"></span>.</p>
+  </footer>
+</main>
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+# Scrying Bull configuration.
+
+data_dir = "data"
+# History to download; strategies warm up on data before eval_start.
+data_start = "2005-01-01"
+# Backtests start trading (and are scored) from here.
+eval_start = "2010-01-01"
+# Starting capital for every backtest and every paper account.
+cash = 100000.0
+
+# A deliberately diverse universe: equity indices, sectors, bonds, commodities,
+# real estate, plus large single names. Yahoo tickers.
+universe = [
+  # broad equity
+  "SPY", "QQQ", "IWM", "DIA", "EFA", "EEM",
+  # sectors
+  "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB",
+  # rates & credit
+  "TLT", "IEF", "SHY", "LQD", "HYG",
+  # real assets
+  "GLD", "SLV", "DBC", "USO", "VNQ",
+  # single names
+  "AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "JPM", "JNJ", "XOM",
+  "PG", "KO", "WMT", "HD", "UNH", "V", "BRK-B", "CAT", "COST",
+]
+
+[costs]
+commission_bps = 1.0  # per side, basis points of notional
+slippage_bps = 5.0    # adverse fill vs. the open
+min_trade = 0.005     # skip rebalances smaller than 0.5% of equity
