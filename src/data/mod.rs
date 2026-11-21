@@ -1,5 +1,7 @@
 //! Market data: bars, on-disk CSV cache, and the aligned multi-symbol panel.
 
+/// Test fixture only: never used for real backtests or the site.
+#[cfg(test)]
 pub mod synthetic;
 pub mod yahoo;
 

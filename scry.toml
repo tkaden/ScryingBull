@@ -3,8 +3,10 @@
 data_dir = "data"
 # History to download; strategies warm up on data before eval_start.
 data_start = "2005-01-01"
-# Backtests start trading (and are scored) from here.
+# Backtests start trading here. 2010-2020 is the TRAIN period (pick strategies on it)...
 eval_start = "2010-01-01"
+# ...and 2021-today is the held-out VALIDATION period (judge those picks on it).
+validation_start = "2021-01-01"
 # Starting capital for every backtest and every paper account.
 cash = 100000.0
 

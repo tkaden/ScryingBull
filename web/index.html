@@ -23,14 +23,20 @@
   </section>
 
   <section class="card">
-    <h2>Backtest Sharpe by family</h2>
-    <p class="note">Each dot is one strategy. The shaded band is the 5th–95th percentile of 20 <em>random</em> strategies, so anything inside it hasn't beaten luck. The dashed line is buy &amp; hold. Click a dot for details.</p>
+    <h2>Validation Sharpe by family <span class="muted" id="val-range"></span></h2>
+    <p class="note">Each dot is one strategy, scored on the held-out validation period. The shaded band is the 5th–95th percentile of 20 <em>random</em> strategies over the same period, so anything inside it hasn't beaten luck. The dashed line is buy &amp; hold. Click a dot for details.</p>
     <div id="strip" class="chart"></div>
   </section>
 
   <section class="card">
-    <h2>Does the backtest predict the paper results?</h2>
-    <p class="note">Backtest Sharpe vs. live paper Sharpe. If backtests were reliable, dots would line up on the diagonal. Most overfit strategies collapse toward zero once trading forward.</p>
+    <h2>Does the train period predict validation?</h2>
+    <p class="note" id="tv-note">Train Sharpe vs. validation Sharpe. If past performance carried forward, dots would line up on the diagonal.</p>
+    <div id="tv" class="chart"></div>
+  </section>
+
+  <section class="card">
+    <h2>Does validation predict live paper trading?</h2>
+    <p class="note">Validation Sharpe vs. forward paper Sharpe: the final, fully out-of-sample test.</p>
     <div id="scatter" class="chart"></div>
   </section>
 
@@ -43,7 +49,7 @@
       <button id="d-close" type="button" aria-label="Close details">Close</button>
     </div>
     <div id="d-stats" class="stats"></div>
-    <h3>Backtest equity <span class="muted">(growth of $1)</span></h3>
+    <h3>Backtest equity <span class="muted">(growth of $1; dotted line marks the start of validation)</span></h3>
     <div id="d-bt" class="chart"></div>
     <h3>Paper trading equity <span class="muted">(growth of $1)</span></h3>
     <div id="d-paper" class="chart"></div>
@@ -53,17 +59,17 @@
 
   <section class="card">
     <h2>Leaderboard</h2>
-    <p class="note">Click a column to sort, a row for details. Backtest columns cover <span id="bt-range"></span>; paper columns start when each strategy was first added to the ledger.</p>
+    <p class="note">Click a column to sort, a row for details. Train: <span id="train-range"></span>. Validation: <span id="bt-range"></span>. Paper columns start when each strategy was first added to the ledger.</p>
     <div class="table-wrap">
       <table id="table">
         <thead><tr>
           <th data-k="id" class="l">Strategy</th>
           <th data-k="family" class="l">Family</th>
-          <th data-k="bt.cagr">CAGR</th>
-          <th data-k="bt.sharpe">Sharpe</th>
-          <th data-k="bt.mdd">Max DD</th>
-          <th data-k="bt.ret1y">1y return</th>
-          <th data-k="bt.beats_random" title="Share of random baseline strategies with a lower Sharpe">Beats random</th>
+          <th data-k="bt.train.sharpe">Train Sharpe</th>
+          <th data-k="bt.val.cagr">Val CAGR</th>
+          <th data-k="bt.val.sharpe">Val Sharpe</th>
+          <th data-k="bt.val.mdd">Val Max DD</th>
+          <th data-k="bt.beats_random_val" title="Share of random baseline strategies with a lower validation Sharpe">Val beats random</th>
           <th data-k="paper.ret">Paper return</th>
           <th data-k="paper.sharpe">Paper Sharpe</th>
           <th data-k="paper.days">Paper days</th>

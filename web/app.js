@@ -3,7 +3,7 @@
 
 const NS = "http://www.w3.org/2000/svg";
 const $ = (s) => document.querySelector(s);
-const state = { data: null, rows: [], sort: { k: "bt.sharpe", asc: false }, selected: null, curves: {} };
+const state = { data: null, rows: [], sort: { k: "bt.val.sharpe", asc: false }, selected: null, curves: {} };
 
 function el(tag, attrs = {}, parent) {
   const e = document.createElementNS(NS, tag);
@@ -75,7 +75,11 @@ async function load() {
       ? "These results use SYNTHETIC data generated for testing. They say nothing about real markets."
       : "Data source unknown.";
   }
-  $("#bt-range").textContent = `${d.eval_start} to ${d.data_end ?? "–"}`;
+  $("#train-range").textContent = `${d.eval_start} to ${d.validation_start}`;
+  $("#bt-range").textContent = `${d.validation_start} to ${d.data_end ?? "–"}`;
+  $("#val-range").textContent = `(${d.validation_start} → ${d.data_end ?? "now"})`;
+  const v = d.validation;
+  if (v) $("#tv-note").textContent += ` Rank correlation: ${num(v.rank_corr)}. The top 10 by train Sharpe averaged ${num(v.top10_val_sharpe)} in validation, against a median of ${num(v.median_val_sharpe)} for all strategies${v.buy_hold_val_sharpe != null ? " and " + num(v.buy_hold_val_sharpe) + " for buy & hold" : ""}.`;
   $("#costs").textContent = `${d.costs.slippage_bps} bps slippage + ${d.costs.commission_bps} bps commission`;
   $("#universe").textContent = d.universe.join(", ");
   $("#generated").textContent = new Date(d.generated).toLocaleString();
@@ -97,25 +101,20 @@ async function load() {
 }
 
 function tiles() {
-  const d = state.data, s = d.strategies;
-  const bh = s.find((x) => x.id === "baseline.buy_hold");
-  const real = s.filter((x) => !x.random && x.bt);
-  const rnd = s.filter((x) => x.random && x.bt).map((x) => x.bt.sharpe).sort((a, b) => a - b);
-  const p95 = quantile(rnd, 0.95);
-  const beat = real.filter((x) => x.bt.sharpe > p95).length;
+  const d = state.data, s = d.strategies, v = d.validation || {};
   const paperDays = Math.max(0, ...s.map((x) => x.paper?.days ?? 0));
   const items = [
     [s.length, "strategies tracked"],
-    [new Set(s.map((x) => x.family)).size, "method families"],
-    [bh ? num(bh.bt.sharpe) : "–", "buy & hold Sharpe (backtest)"],
-    [`${beat} / ${real.length}`, "beat the 95th pct. of random"],
+    [v.buy_hold_val_sharpe != null ? num(v.buy_hold_val_sharpe) : "–", "buy & hold Sharpe (validation)"],
+    [v.rank_corr != null ? num(v.rank_corr) : "–", "train → validation rank correlation"],
+    [`${(v.robust || []).length} / ${v.strategies ?? "–"}`, "beat 95% of random in train AND validation"],
     [paperDays, `paper trading days${d.paper_date ? " (to " + d.paper_date + ")" : ""}`],
   ];
   const root = $("#tiles");
   root.replaceChildren();
-  for (const [v, k] of items) {
+  for (const [val, k] of items) {
     const t = h("div", { cls: "tile" }, root);
-    h("div", { cls: "v", text: String(v) }, t);
+    h("div", { cls: "v", text: String(val) }, t);
     h("div", { cls: "k", text: k }, t);
   }
 }
@@ -130,6 +129,7 @@ function visible() {
 function render() {
   state.rows = visible();
   strip();
+  trainVal();
   scatter();
   table();
 }
@@ -141,17 +141,17 @@ function strip() {
   const all = state.data.strategies.filter((s) => s.bt);
   const rows = state.rows.filter((s) => s.bt);
   if (!rows.length) return h("div", { cls: "empty", text: "No strategies match the filters." }, root);
-  const rnd = all.filter((s) => s.random).map((s) => s.bt.sharpe).sort((a, b) => a - b);
+  const rnd = all.filter((s) => s.random).map((s) => s.bt.val.sharpe).sort((a, b) => a - b);
   const bh = all.find((s) => s.id === "baseline.buy_hold");
   const byFam = {};
   for (const s of rows) (byFam[s.family] ||= []).push(s);
-  const fams = Object.keys(byFam).sort((a, b) => quantile(byFam[b].map((s) => s.bt.sharpe).sort((x, y) => x - y), 0.5) - quantile(byFam[a].map((s) => s.bt.sharpe).sort((x, y) => x - y), 0.5));
+  const fams = Object.keys(byFam).sort((a, b) => quantile(byFam[b].map((s) => s.bt.val.sharpe).sort((x, y) => x - y), 0.5) - quantile(byFam[a].map((s) => s.bt.val.sharpe).sort((x, y) => x - y), 0.5));
   const W = root.clientWidth || 800, left = Math.min(130, W * 0.3), right = 16, top = 24, rowH = 30;
   const H = top + fams.length * rowH + 24;
-  const xs = all.map((s) => s.bt.sharpe);
+  const xs = all.map((s) => s.bt.val.sharpe);
   const lo = Math.min(...xs, 0), hi = Math.max(...xs, 0.1);
   const x = (v) => left + ((v - lo) / (hi - lo)) * (W - left - right);
-  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Backtest Sharpe ratio of each strategy, grouped by family" }, root);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Validation Sharpe ratio of each strategy, grouped by family" }, root);
   for (const t of niceTicks(lo, hi, Math.max(3, Math.floor(W / 110)))) {
     el("line", { x1: x(t), x2: x(t), y1: top - 6, y2: H - 20, class: "grid" }, svg);
     el("text", { x: x(t), y: H - 4, "text-anchor": "middle" }, svg).textContent = t;
@@ -161,14 +161,14 @@ function strip() {
     el("text", { x: x(quantile(rnd, 0.5)), y: top - 10, "text-anchor": "middle" }, svg).textContent = "random 5–95%";
   }
   if (bh) {
-    el("line", { x1: x(bh.bt.sharpe), x2: x(bh.bt.sharpe), y1: top - 6, y2: H - 20, stroke: css("--text-secondary"), "stroke-dasharray": "4 3", "stroke-width": 1.5 }, svg);
+    el("line", { x1: x(bh.bt.val.sharpe), x2: x(bh.bt.val.sharpe), y1: top - 6, y2: H - 20, stroke: css("--text-secondary"), "stroke-dasharray": "4 3", "stroke-width": 1.5 }, svg);
   }
   const pts = [];
   fams.forEach((f, r) => {
     const cy = top + r * rowH + rowH / 2;
     el("text", { x: left - 10, y: cy + 4, "text-anchor": "end", class: "lbl" }, svg).textContent = f;
     byFam[f].forEach((s) => {
-      const cx = x(s.bt.sharpe);
+      const cx = x(s.bt.val.sharpe);
       const sel = s.id === state.selected;
       el("circle", {
         cx, cy, r: sel ? 6 : 4,
@@ -180,7 +180,7 @@ function strip() {
       pts.push({ cx, cy, s });
     });
   });
-  hoverNearest(svg, pts, W, H, (s) => [[css("--series-1"), num(s.bt.sharpe), "Sharpe"], [css("--text-muted"), pct(s.bt.cagr), "CAGR"]]);
+  hoverNearest(svg, pts, W, H, (s) => [[css("--series-1"), num(s.bt.val.sharpe), "validation Sharpe"], [css("--text-muted"), num(s.bt.train.sharpe), "train Sharpe"]]);
 }
 
 // Nearest-point hover + click on a scatter-like SVG.
@@ -212,22 +212,15 @@ function hoverNearest(svg, pts, W, H, rowsFor) {
   hit.addEventListener("click", (evt) => { const b = nearest(evt); if (b) select(b.s.id); });
 }
 
-// ---------- scatter: backtest vs paper ----------
-const MIN_PAPER_DAYS = 20;
-function scatter() {
-  const root = $("#scatter");
+// ---------- scatters ----------
+function scatterXY(root, rows, fx, fy, xLabel, yLabel, tipFor) {
   root.replaceChildren();
-  const rows = state.rows.filter((s) => s.bt && s.paper && s.paper.days >= MIN_PAPER_DAYS);
-  if (!rows.length) {
-    const days = Math.max(0, ...state.data.strategies.map((s) => s.paper?.days ?? 0));
-    return h("div", { cls: "empty", text: `Paper trading has ${days} day(s) of history so far. This chart appears after ${MIN_PAPER_DAYS}.` }, root);
-  }
   const W = root.clientWidth || 800, H = Math.min(420, Math.max(260, W * 0.5)), m = { l: 44, r: 16, t: 12, b: 34 };
-  const xs = rows.map((s) => s.bt.sharpe), ys = rows.map((s) => s.paper.sharpe);
+  const xs = rows.map(fx), ys = rows.map(fy);
   const lo = Math.min(...xs, ...ys, 0), hi = Math.max(...xs, ...ys, 0.5);
   const x = (v) => m.l + ((v - lo) / (hi - lo)) * (W - m.l - m.r);
   const y = (v) => H - m.b - ((v - lo) / (hi - lo)) * (H - m.t - m.b);
-  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Backtest Sharpe versus paper Sharpe per strategy" }, root);
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${xLabel} versus ${yLabel} per strategy` }, root);
   for (const t of niceTicks(lo, hi, 6)) {
     el("line", { x1: x(t), x2: x(t), y1: m.t, y2: H - m.b, class: "grid" }, svg);
     el("line", { x1: m.l, x2: W - m.r, y1: y(t), y2: y(t), class: "grid" }, svg);
@@ -235,14 +228,33 @@ function scatter() {
     el("text", { x: m.l - 6, y: y(t) + 4, "text-anchor": "end" }, svg).textContent = t;
   }
   el("line", { x1: x(lo), y1: y(lo), x2: x(hi), y2: y(hi), stroke: css("--text-muted"), "stroke-dasharray": "4 3" }, svg);
-  el("text", { x: (W + m.l) / 2, y: H - 2, "text-anchor": "middle", class: "lbl" }, svg).textContent = "Backtest Sharpe";
-  el("text", { x: 12, y: m.t + 10, class: "lbl" }, svg).textContent = "Paper Sharpe";
+  el("text", { x: (W + m.l) / 2, y: H - 2, "text-anchor": "middle", class: "lbl" }, svg).textContent = xLabel;
+  el("text", { x: m.l + 6, y: m.t + 10, class: "lbl" }, svg).textContent = yLabel;
   const pts = rows.map((s) => {
-    const cx = x(s.bt.sharpe), cy = y(s.paper.sharpe);
-    el("circle", { cx, cy, r: 4, fill: s.random ? css("--null") : css("--series-1"), "fill-opacity": 0.6, stroke: css("--surface-1") }, svg);
+    const cx = x(fx(s)), cy = y(fy(s)), sel = s.id === state.selected;
+    el("circle", { cx, cy, r: sel ? 6 : 4, fill: s.random ? css("--null") : css("--series-1"), "fill-opacity": sel ? 1 : 0.55, stroke: sel ? css("--text-primary") : css("--surface-1"), "stroke-width": sel ? 2 : 1 }, svg);
     return { cx, cy, s };
   });
-  hoverNearest(svg, pts, W, H, (s) => [[css("--series-1"), num(s.bt.sharpe), "backtest Sharpe"], [css("--series-2"), num(s.paper.sharpe), `paper Sharpe (${s.paper.days} days)`]]);
+  hoverNearest(svg, pts, W, H, tipFor);
+}
+
+function trainVal() {
+  const rows = state.rows.filter((s) => s.bt);
+  if (!rows.length) return $("#tv").replaceChildren(h("div", { cls: "empty", text: "No strategies match the filters." }));
+  scatterXY($("#tv"), rows, (s) => s.bt.train.sharpe, (s) => s.bt.val.sharpe, "Train Sharpe", "Validation Sharpe",
+    (s) => [[css("--series-1"), num(s.bt.train.sharpe), "train Sharpe"], [css("--series-2"), num(s.bt.val.sharpe), "validation Sharpe"]]);
+}
+
+const MIN_PAPER_DAYS = 20;
+function scatter() {
+  const root = $("#scatter");
+  const rows = state.rows.filter((s) => s.bt && s.paper && s.paper.days >= MIN_PAPER_DAYS);
+  if (!rows.length) {
+    const days = Math.max(0, ...state.data.strategies.map((s) => s.paper?.days ?? 0));
+    return root.replaceChildren(h("div", { cls: "empty", text: `Paper trading has ${days} day(s) of history so far. This chart appears after ${MIN_PAPER_DAYS}.` }));
+  }
+  scatterXY(root, rows, (s) => s.bt.val.sharpe, (s) => s.paper.sharpe, "Validation Sharpe", "Paper Sharpe",
+    (s) => [[css("--series-1"), num(s.bt.val.sharpe), "validation Sharpe"], [css("--series-2"), num(s.paper.sharpe), `paper Sharpe (${s.paper.days} days)`]]);
 }
 
 // ---------- table ----------
@@ -268,11 +280,11 @@ function table() {
     const td = (text, cls = "") => h("td", { text, cls }, tr);
     td(s.id, "l id");
     td(s.family, "l");
-    td(pct(s.bt?.cagr), signCls(s.bt?.cagr));
-    td(num(s.bt?.sharpe));
-    td(pct(s.bt?.mdd), "neg");
-    td(pct(s.bt?.ret1y), signCls(s.bt?.ret1y));
-    td(s.bt ? Math.round(s.bt.beats_random * 100) + "%" : "–");
+    td(num(s.bt?.train.sharpe));
+    td(pct(s.bt?.val.cagr), signCls(s.bt?.val.cagr));
+    td(num(s.bt?.val.sharpe));
+    td(pct(s.bt?.val.mdd), "neg");
+    td(s.bt ? Math.round(s.bt.beats_random_val * 100) + "%" : "–");
     td(pct(s.paper?.ret, 2), signCls(s.paper?.ret));
     td(s.paper && s.paper.days >= 2 ? num(s.paper.sharpe) : "–");
     td(String(s.paper?.days ?? "–"));
@@ -303,9 +315,11 @@ async function select(id, scroll = true) {
   const stats = $("#d-stats");
   stats.replaceChildren();
   const items = s.bt ? [
-    [pct(s.bt.cagr), "CAGR"], [num(s.bt.sharpe), "Sharpe"], [num(s.bt.sortino), "Sortino"], [pct(s.bt.mdd), "Max drawdown"],
-    [pct(s.bt.vol), "Volatility"], [pct(s.bt.exposure, 0), "Avg exposure"], [num(s.bt.turnover, 1) + "x", "Turnover / yr"],
-    [Math.round(s.bt.beats_random * 100) + "%", "Beats random"],
+    [pct(s.bt.train.cagr), "Train CAGR"], [num(s.bt.train.sharpe), "Train Sharpe"], [pct(s.bt.train.mdd), "Train max DD"],
+    [Math.round(s.bt.beats_random_train * 100) + "%", "Train beats random"],
+    [pct(s.bt.val.cagr), "Val CAGR"], [num(s.bt.val.sharpe), "Val Sharpe"], [pct(s.bt.val.mdd), "Val max DD"],
+    [Math.round(s.bt.beats_random_val * 100) + "%", "Val beats random"],
+    [pct(s.bt.exposure, 0), "Avg exposure"], [num(s.bt.turnover, 1) + "x", "Turnover / yr"],
   ] : [];
   if (s.paper) items.push([pct(s.paper.ret, 2), `Paper return (${s.paper.days}d)`], [s.paper.inception, "Paper since"]);
   for (const [v, l] of items) {
@@ -330,12 +344,12 @@ async function select(id, scroll = true) {
     }
     return out;
   };
-  lineChart($("#d-bt"), series("bt"), "Backtest equity, indexed to 1");
+  lineChart($("#d-bt"), series("bt"), "Backtest equity, indexed to 1", "No data.", state.data.validation_start);
   lineChart($("#d-paper"), series("paper"), "Paper equity, indexed to 1", "No paper history yet: this strategy's first orders fill at the next open.");
   if (scroll) box.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function lineChart(root, series, label, emptyText = "No data.") {
+function lineChart(root, series, label, emptyText = "No data.", marker = null) {
   root.replaceChildren();
   series = series.filter((s) => s.pts && s.pts.length >= 2).map((s) => ({ ...s, pts: s.pts.map(([d, v]) => [new Date(d).getTime(), v / s.pts[0][1], d]) }));
   if (!series.length) return h("div", { cls: "empty", text: emptyText }, root);
@@ -363,6 +377,13 @@ function lineChart(root, series, label, emptyText = "No data.") {
     el("text", { x: x(t), y: H - 6, "text-anchor": "middle" }, svg).textContent = fmt(t);
   }
   el("line", { x1: m.l, x2: W - m.r, y1: y(1), y2: y(1), stroke: css("--text-muted"), "stroke-dasharray": "2 3" }, svg);
+  if (marker) {
+    const mt = new Date(marker).getTime();
+    if (mt > x0 && mt < x1) {
+      el("line", { x1: x(mt), x2: x(mt), y1: m.t, y2: H - m.b, stroke: css("--text-secondary"), "stroke-dasharray": "2 3" }, svg);
+      el("text", { x: x(mt) + 4, y: m.t + 10, class: "lbl" }, svg).textContent = "validation →";
+    }
+  }
   for (const s of [...series].reverse()) {
     el("path", { d: "M" + s.pts.map((p) => `${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join("L"), fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round" }, svg);
     const last = s.pts[s.pts.length - 1];

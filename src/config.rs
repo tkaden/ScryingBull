@@ -14,8 +14,12 @@ pub struct Config {
     pub data_dir: PathBuf,
     /// First date of history to download / load (warm-up starts here).
     pub data_start: NaiveDate,
-    /// Backtests trade and are scored from this date.
+    /// Backtests start trading here. [eval_start, validation_start) is the
+    /// *train* period: use it to choose strategies and parameters.
     pub eval_start: NaiveDate,
+    /// [validation_start, today] is the held-out *validation* period. Judge
+    /// choices made on the train period here; never choose based on it.
+    pub validation_start: NaiveDate,
     /// Starting capital for every backtest and paper account.
     pub cash: f64,
     pub costs: Costs,

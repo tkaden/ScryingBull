@@ -6,12 +6,13 @@ hundreds of ways of doing that with markets, and keeps score honestly.
 Scrying Bull runs **350+ trading strategies from 11 very different method
 families** side by side on the same universe:
 
-1. It **backtests** every strategy.
+1. It **backtests** every strategy on 20 years of real daily prices, split into a
+   *train* period (2010–2020) and a held-out *validation* period (2021–today).
 2. It **paper trades** every strategy forward, one market day at a time, in an
    append-only ledger.
 3. It **publishes** a static leaderboard site that compares backtest results with paper results.
 
-Written in Rust. A full backtest of every strategy over ~20 years × 43 symbols takes a few seconds.
+Written in Rust. A full backtest of every strategy over ~20 years × 43 symbols takes about 6 seconds.
 
 | Family | Examples |
 |---|---|
@@ -52,23 +53,50 @@ The point is to find out what *actually* works, so the design makes fooling your
 
 ```bash
 cargo build --release
-
-# Offline: synthetic data (for development only; says nothing about real markets)
-./target/release/scry synth
-./target/release/scry backtest --top 20
-
-# Real data from Yahoo Finance
-./target/release/scry fetch
+./target/release/scry fetch                  # download daily history from Yahoo Finance
+./target/release/scry backtest --top 25      # train/validation leaderboard + validation report
 ./target/release/scry backtest --filter mean_reversion
-./target/release/scry paper          # advance the paper ledger to the latest close
-./target/release/scry site           # build ./site from results + ledger
-python3 -m http.server -d site       # view it at http://localhost:8000
+./target/release/scry paper                  # advance the paper ledger to the latest close
+./target/release/scry site                   # build ./site from results + ledger
+python3 -m http.server -d site               # view it at http://localhost:8000
 
-./target/release/scry daily          # fetch + backtest + paper + site in one go
-./target/release/scry list           # every strategy id and description
+./target/release/scry daily                  # fetch + backtest + paper + site in one go
+./target/release/scry list                   # every strategy id and description
 ```
 
 Configuration lives in `scry.toml`: universe, dates, starting cash and trading costs.
+All backtests use real market data. A synthetic generator exists only as a unit-test fixture.
+
+## Train / validation
+
+- **Train (2010–2020):** pick strategies and parameters here.
+- **Validation (2021–today):** judge those picks here. Never pick on it.
+
+The leaderboard is ranked by train Sharpe, with validation shown beside it. That is
+exactly the "what would I have picked, and how did it do?" view. The site plots
+train vs validation for every strategy and reports the rank correlation.
+
+What the real data says (as of Nov 2026, 43-symbol universe, 6 bps costs):
+
+- **Rankings persist.** The train→validation Sharpe rank correlation is 0.87. That
+  isn't just market exposure: exposure alone correlates 0.07, and among long-only
+  strategies the correlation is still 0.71.
+- **Very little beats buy & hold.** Only 11 of 336 strategies beat buy & hold's Sharpe
+  in training. Only 7 beat it in both periods: cross-sectional momentum and
+  volatility targeting. The top 10 by train Sharpe averaged 0.81 in validation,
+  below buy & hold's 0.87.
+- **Survivorship bias is real here.** On an ETF-only universe (no hindsight stock
+  picks), cross-sectional momentum *loses* to buy & hold in training (0.61 vs
+  0.79). Its edge on the default universe comes largely from holding stocks known
+  in 2026 to have been winners.
+- **Volatility targeting is the robust result.** It beats buy & hold's Sharpe on
+  both universes and in both periods, with about half the drawdown, but at a lower
+  return (Sharpe 1.13 vs 0.87 in validation, CAGR 9% vs 20%).
+- **Some families did badly.** Online learners, calendar effects and the
+  statistical regime models have median validation Sharpes near or below zero.
+
+Paper trading is the final, fully out-of-sample test. The site's third chart
+compares validation results with forward paper results as the ledger grows.
 
 ## Deployment (GitHub Pages)
 
@@ -176,8 +204,9 @@ src/
 - Daily bars only, and data comes from Yahoo's unofficial chart API. A paid feed
   (Polygon, Tiingo, Alpaca) would be more reliable.
 - Shorts have no borrow fees, and holidays are approximated in the calendar strategies.
-- The universe is fixed and has survivorship bias: today's large caps looked
-  great in hindsight. Point-in-time index membership would fix this.
+- The default universe has survivorship bias (see Train / validation above).
+  Point-in-time index membership would fix it. Meanwhile, an ETF-only universe is
+  the more honest test.
 - Ideas for more families: pairs/cointegration, regime HMMs, options-implied
   signals, macro/rates signals, sentiment/news, genetic programming over the indicator library.
 - Only Alpaca is supported. Interactive Brokers or Tradier could implement the same `Broker` trait.

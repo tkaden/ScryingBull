@@ -1,7 +1,7 @@
 //! Static website: a leaderboard of every strategy, backtest vs. paper.
 //! Output is plain files (HTML/JS/CSS + JSON) suitable for GitHub Pages.
 
-use crate::backtest::BacktestResult;
+use crate::backtest::{validation_report, BacktestResult};
 use crate::config::Config;
 use crate::metrics::compute;
 use crate::paper::Ledger;
@@ -64,7 +64,10 @@ pub fn build(out: &Path, cfg: &Config, results: &[BacktestResult], ledger: &Ledg
                 "vol": r4(m.vol), "total": r4(m.total_return), "calmar": r4(m.calmar), "hit": r4(m.hit_rate),
                 "ret1y": r4(b.last_year.total_return), "sharpe1y": r4(b.last_year.sharpe),
                 "trades": b.trades, "turnover": r4(b.turnover), "exposure": r4(b.avg_exposure),
-                "beats_random": r4(b.beats_random),
+                "beats_random_train": r4(b.beats_random_train),
+                "beats_random_val": r4(b.beats_random_validation),
+                "train": { "cagr": r4(b.train.cagr), "sharpe": r4(b.train.sharpe), "mdd": r4(b.train.max_drawdown) },
+                "val": { "cagr": r4(b.validation.cagr), "sharpe": r4(b.validation.sharpe), "mdd": r4(b.validation.max_drawdown), "total": r4(b.validation.total_return) },
                 "yearly": m.yearly.iter().map(|(y, r)| (y.to_string(), Value::from(r4(*r)))).collect::<serde_json::Map<_, _>>(),
             })}),
             "paper": paper,
@@ -83,6 +86,8 @@ pub fn build(out: &Path, cfg: &Config, results: &[BacktestResult], ledger: &Ledg
         "generated": Utc::now().to_rfc3339(),
         "source": source.trim(),
         "eval_start": cfg.eval_start,
+        "validation_start": cfg.validation_start,
+        "validation": validation_report(results),
         "data_end": results.first().and_then(|r| r.metrics.end),
         "paper_date": ledger.last_date,
         "universe": cfg.universe,

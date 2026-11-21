@@ -1,9 +1,9 @@
 use anyhow::{bail, Result};
-use chrono::{Duration, NaiveDate, Utc};
+use chrono::{NaiveDate, Utc};
 use clap::{Parser, Subcommand};
 use scrying_bull::backtest::{self, BacktestResult};
 use scrying_bull::config::Config;
-use scrying_bull::data::{synthetic, yahoo, Panel};
+use scrying_bull::data::{yahoo, Panel};
 use scrying_bull::paper::{self, Ledger};
 use scrying_bull::site;
 use scrying_bull::strategies::registry;
@@ -29,11 +29,6 @@ struct Cli {
 enum Cmd {
     /// Download daily bars for the universe from Yahoo Finance into the data cache.
     Fetch,
-    /// Write synthetic data for the universe (offline development; NOT real markets).
-    Synth {
-        #[arg(long, default_value_t = 42)]
-        seed: u64,
-    },
     /// List registered strategies.
     List {
         /// Only ids containing this text.
@@ -93,9 +88,6 @@ enum Cmd {
         ledger: PathBuf,
         #[arg(long, default_value = "site")]
         out: PathBuf,
-        /// Use synthetic data instead of fetching (for local dry runs).
-        #[arg(long)]
-        synthetic: bool,
     },
 }
 
@@ -104,7 +96,6 @@ fn main() -> Result<()> {
     let cfg = Config::load(&cli.config)?;
     match cli.cmd {
         Cmd::Fetch => fetch(&cfg),
-        Cmd::Synth { seed } => synth(&cfg, seed),
         Cmd::List { filter } => {
             let specs = filtered(filter.as_deref())?;
             for s in &specs {
@@ -142,16 +133,8 @@ fn main() -> Result<()> {
             min_days,
             top,
         } => candidates(&Ledger::load(&ledger)?, min_days, top),
-        Cmd::Daily {
-            ledger,
-            out,
-            synthetic,
-        } => {
-            if synthetic {
-                synth(&cfg, 42)?;
-            } else {
-                fetch(&cfg)?;
-            }
+        Cmd::Daily { ledger, out } => {
+            fetch(&cfg)?;
             let results = run_backtest(&cfg, &registry())?;
             print_leaderboard(&results, 15);
             write_json(Path::new("results/backtest.json"), &results)?;
@@ -212,20 +195,6 @@ fn fetch(cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-fn synth(cfg: &Config, seed: u64) -> Result<()> {
-    let end = Utc::now().date_naive() - Duration::days(1);
-    for s in synthetic::generate(&cfg.universe, cfg.data_start, end, seed) {
-        s.save(&cfg.data_dir)?;
-    }
-    std::fs::write(cfg.data_dir.join(site::SOURCE_FILE), "synthetic")?;
-    println!(
-        "wrote synthetic data for {} symbols to {}",
-        cfg.universe.len(),
-        cfg.data_dir.display()
-    );
-    Ok(())
-}
-
 fn load_panel(cfg: &Config) -> Result<Panel> {
     let p = Panel::load(&cfg.data_dir, &cfg.universe, cfg.data_start)?;
     println!(
@@ -241,7 +210,14 @@ fn load_panel(cfg: &Config) -> Result<Panel> {
 fn run_backtest(cfg: &Config, specs: &[Spec]) -> Result<Vec<BacktestResult>> {
     let panel = load_panel(cfg)?;
     let t = Instant::now();
-    let r = backtest::run_all(specs, &panel, cfg.eval_start, cfg.cash, &cfg.costs);
+    let r = backtest::run_all(
+        specs,
+        &panel,
+        cfg.eval_start,
+        cfg.validation_start,
+        cfg.cash,
+        &cfg.costs,
+    );
     println!(
         "backtested {} strategies in {:.1}s",
         r.len(),
@@ -276,31 +252,34 @@ fn run_paper(cfg: &Config, path: &Path) -> Result<Ledger> {
 }
 
 fn print_leaderboard(results: &[BacktestResult], top: usize) {
+    println!("\nRanked by TRAIN Sharpe (what you'd pick); VALIDATION is the held-out check.");
     println!(
-        "\n{:<46} {:>7} {:>7} {:>7} {:>8} {:>6} {:>7}",
-        "strategy", "CAGR", "Sharpe", "MaxDD", "1y ret", "trades", ">rand"
+        "{:<46} {:>7} | {:>7} {:>7} {:>7} {:>6}",
+        "strategy", "train S", "val S", "val CAGR", "val DD", ">rand"
     );
     for r in results.iter().take(top) {
-        let m = &r.metrics;
+        let v = &r.validation;
         println!(
-            "{:<46} {:>6.1}% {:>7.2} {:>6.1}% {:>7.1}% {:>6} {:>6.0}%",
+            "{:<46} {:>7.2} | {:>7.2} {:>7.1}% {:>6.1}% {:>5.0}%",
             r.id,
-            m.cagr * 100.0,
-            m.sharpe,
-            m.max_drawdown * 100.0,
-            r.last_year.total_return * 100.0,
-            r.trades,
-            r.beats_random * 100.0
+            r.train.sharpe,
+            v.sharpe,
+            v.cagr * 100.0,
+            v.max_drawdown * 100.0,
+            r.beats_random_validation * 100.0
         );
     }
-    if let Some(bh) = results.iter().find(|r| r.id == "baseline.buy_hold") {
-        let rank = results.iter().position(|r| r.id == bh.id).unwrap() + 1;
-        println!(
-            "\nbuy & hold: CAGR {:.1}%, Sharpe {:.2} (rank {rank} of {})",
-            bh.metrics.cagr * 100.0,
-            bh.metrics.sharpe,
-            results.len()
-        );
+    let rep = backtest::validation_report(results);
+    println!(
+        "\nvalidation report over {} strategies:\n  train->validation Sharpe rank correlation: {:.2}\n  top 10 by train: mean validation Sharpe {:.2}\n  all strategies: median validation Sharpe {:.2}",
+        rep.strategies, rep.rank_corr, rep.top10_val_sharpe, rep.median_val_sharpe
+    );
+    if let Some(b) = rep.buy_hold_val_sharpe {
+        println!("  buy & hold: validation Sharpe {b:.2}");
+    }
+    println!("  beat 95% of random in BOTH periods: {}", rep.robust.len());
+    for id in rep.robust.iter().take(15) {
+        println!("    {id}");
     }
 }
 
