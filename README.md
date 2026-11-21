@@ -80,6 +80,58 @@ record has an auditable git history and `main` stays clean.
 One-time setup: **Settings → Pages → Source: GitHub Actions**. You can also run the
 workflow by hand from the Actions tab (`workflow_dispatch`).
 
+## Trading with real money (Alpaca)
+
+`scry live` mirrors one or more strategies into an [Alpaca](https://alpaca.markets)
+brokerage account. The broker account copies what those strategies' **paper
+accounts** will hold after the next open, scaled to your budget. Orders go out
+after the close as market/day orders and fill at the next open, the same timing
+as the backtests. Alpaca is commission-free and supports fractional shares, so a
+budget of a few hundred dollars works.
+
+**Start on Alpaca's paper environment, then switch one line to go live.**
+
+1. Create an Alpaca account and generate API keys. Paper and live accounts have separate keys.
+2. Configure the `[live]` section in `scry.toml`:
+   ```toml
+   [live]
+   mode = "paper"                         # then "live"
+   strategies = ["ensemble.family_vote"]  # ids to mirror; weights are averaged
+   budget = 500.0
+   halt_below = 400.0                     # kill switch
+   ```
+3. Choose strategies from their *paper* record, not their backtest:
+   `scry candidates --min-days 60` ranks them against the random baselines.
+4. Try it:
+   ```bash
+   export ALPACA_KEY_ID=... ALPACA_SECRET_KEY=...
+   scry live                    # dry run: prints target weights and the orders it would send
+   scry live --execute          # sends orders (paper account)
+   scry live --execute --real-money   # required once mode = "live"
+   ```
+5. To automate it, add the keys as repo **secrets** `ALPACA_KEY_ID` / `ALPACA_SECRET_KEY`.
+   Then set the repo **variable** `LIVE_EXECUTE=true`. For real money, also set
+   `LIVE_REAL_MONEY=true`. Without these variables the daily job only logs a dry run.
+
+Guardrails:
+
+- **Budget-isolated.** The bot keeps its own cash ledger: the budget, minus its
+  buys, plus its sells, reconciled from actual fills. It never spends other cash in
+  the account, and never uses margin. Raising `budget` adds the difference.
+- **Kill switch.** If the bot's value (its positions plus its cash) falls below
+  `halt_below`, it liquidates and stops. It stays stopped until you clear `halted`
+  in `live_state.json`.
+- **Long-only.** Short targets are dropped.
+- **Narrow scope.** It only touches symbols in the universe and only cancels its own
+  orders (client ids start with `scry-`). Even so, use an account where you don't
+  hand-trade the same tickers.
+- **Refuses stale signals.** It won't trade if the paper ledger is more than 5 days old.
+- **Audited.** Every executed run is appended to `live_log.jsonl` on the `ledger` branch.
+
+Small accounts are subject to US pattern-day-trader rules. This bot trades at most
+once a day per symbol, but fast-flipping strategies can still rack up day trades if
+an order fills intraday.
+
 ## Adding a strategy
 
 Single-asset methods implement `SymbolStrategy` and return the exposure you want, from −1 to 1:
@@ -115,6 +167,8 @@ src/
   paper.rs       append-only paper ledger
   metrics.rs     CAGR, Sharpe, Sortino, drawdown, yearly returns
   site.rs        static site generator (assets in web/)
+  broker.rs      Alpaca REST client behind a `Broker` trait
+  live.rs        mirror paper accounts into a broker account, with guardrails
 ```
 
 ## Limitations and next steps
@@ -126,7 +180,8 @@ src/
   great in hindsight. Point-in-time index membership would fix this.
 - Ideas for more families: pairs/cointegration, regime HMMs, options-implied
   signals, macro/rates signals, sentiment/news, genetic programming over the indicator library.
-- Paper trading is simulated internally. A broker adapter (e.g. Alpaca paper API)
-  could mirror the top few strategies with real order routing.
+- Only Alpaca is supported. Interactive Brokers or Tradier could implement the same `Broker` trait.
+- Dividends paid into the broker account aren't credited to the bot's cash ledger,
+  so its reported value slightly understates returns.
 
 Not investment advice.

@@ -1,6 +1,7 @@
 //! `scry.toml` configuration.
 
 use crate::engine::Costs;
+use crate::live::LiveConfig;
 use anyhow::{Context, Result};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
@@ -19,6 +20,9 @@ pub struct Config {
     pub cash: f64,
     pub costs: Costs,
     pub universe: Vec<String>,
+    /// Optional: mirror strategies into a broker account.
+    #[serde(default)]
+    pub live: Option<LiveConfig>,
 }
 
 impl Config {

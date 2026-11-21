@@ -28,3 +28,14 @@ universe = [
 commission_bps = 1.0  # per side, basis points of notional
 slippage_bps = 5.0    # adverse fill vs. the open
 min_trade = 0.005     # skip rebalances smaller than 0.5% of equity
+
+# Optional: mirror strategies into an Alpaca brokerage account.
+# Credentials come from the environment: ALPACA_KEY_ID / ALPACA_SECRET_KEY.
+# `scry live` is a dry run; `--execute` sends orders; real money also needs `--real-money`.
+[live]
+mode = "paper"                          # "paper" (Alpaca paper account) or "live" (REAL MONEY)
+strategies = ["ensemble.family_vote"]   # paper-ledger ids to mirror; weights are averaged
+budget = 500.0                          # dollars the bot may use; other cash is never touched
+halt_below = 400.0                      # kill switch: liquidate and stop if the bot's value falls below this
+min_order = 5.0                         # smallest order, dollars
+band = 0.02                             # ignore rebalances smaller than 2% of the bot's value

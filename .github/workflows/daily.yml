@@ -5,6 +5,11 @@
 # the paper-trading history is an auditable, append-only git log.
 #
 # One-time setup: Settings -> Pages -> Source: "GitHub Actions".
+#
+# Optional broker mirroring (see README "Trading with real money"):
+#   secrets   ALPACA_KEY_ID, ALPACA_SECRET_KEY
+#   variables LIVE_EXECUTE=true      -> send orders (otherwise dry run in the log)
+#             LIVE_REAL_MONEY=true   -> required when scry.toml has live.mode = "live"
 
 name: Daily
 
@@ -25,6 +30,8 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    env:
+      ALPACA_KEY_ID: ${{ secrets.ALPACA_KEY_ID }}
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -50,12 +57,24 @@ jobs:
       - name: Fetch, backtest, paper trade, build site
         run: ./target/release/scry daily --ledger ledger/ledger.json --out site
 
+      - name: Mirror strategies to broker
+        if: ${{ env.ALPACA_KEY_ID != '' }}
+        continue-on-error: true # never block the paper ledger or the site
+        env:
+          ALPACA_KEY_ID: ${{ secrets.ALPACA_KEY_ID }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+        run: |
+          args="--ledger ledger/ledger.json --state ledger/live_state.json"
+          [ "${{ vars.LIVE_EXECUTE }}" = "true" ] && args="$args --execute"
+          [ "${{ vars.LIVE_REAL_MONEY }}" = "true" ] && args="$args --real-money"
+          ./target/release/scry live $args
+
       - name: Commit ledger
         working-directory: ledger
         run: |
           git config user.name "scrying-bull-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ledger.json
+          git add ledger.json $(ls live_state.json live_log.jsonl 2>/dev/null)
           if git diff --cached --quiet; then
             echo "ledger unchanged"
           else

@@ -64,6 +64,29 @@ enum Cmd {
         #[arg(long, default_value = "site")]
         out: PathBuf,
     },
+    /// Mirror the configured strategies into an Alpaca account. Dry run unless --execute.
+    Live {
+        #[arg(long, default_value = "ledger/ledger.json")]
+        ledger: PathBuf,
+        #[arg(long, default_value = "ledger/live_state.json")]
+        state: PathBuf,
+        /// Actually send orders (otherwise only print the plan).
+        #[arg(long)]
+        execute: bool,
+        /// Required in addition to --execute when `live.mode = "live"`.
+        #[arg(long)]
+        real_money: bool,
+    },
+    /// Rank strategies by their *paper* record, to choose what to trade live.
+    Candidates {
+        #[arg(long, default_value = "ledger/ledger.json")]
+        ledger: PathBuf,
+        /// Minimum paper trading days.
+        #[arg(long, default_value_t = 60)]
+        min_days: usize,
+        #[arg(long, default_value_t = 20)]
+        top: usize,
+    },
     /// fetch + backtest + paper + site: what the daily job runs.
     Daily {
         #[arg(long, default_value = "ledger/ledger.json")]
@@ -108,6 +131,17 @@ fn main() -> Result<()> {
             println!("site written to {}", out.display());
             Ok(())
         }
+        Cmd::Live {
+            ledger,
+            state,
+            execute,
+            real_money,
+        } => run_live(&cfg, &ledger, &state, execute, real_money),
+        Cmd::Candidates {
+            ledger,
+            min_days,
+            top,
+        } => candidates(&Ledger::load(&ledger)?, min_days, top),
         Cmd::Daily {
             ledger,
             out,
@@ -275,5 +309,180 @@ fn write_json<T: serde::Serialize>(path: &Path, v: &T) -> Result<()> {
         std::fs::create_dir_all(d)?;
     }
     std::fs::write(path, serde_json::to_string(v)?)?;
+    Ok(())
+}
+
+fn run_live(
+    cfg: &Config,
+    ledger_path: &Path,
+    state_path: &Path,
+    execute: bool,
+    real_money: bool,
+) -> Result<()> {
+    use scrying_bull::broker::{Alpaca, Broker};
+    use scrying_bull::live::{self, LiveState, Mode};
+
+    let Some(lc) = &cfg.live else {
+        bail!("no [live] section in {}", "scry.toml")
+    };
+    if execute && lc.mode == Mode::Live && !real_money {
+        bail!("live.mode = \"live\" trades REAL MONEY; pass --real-money as well as --execute to confirm");
+    }
+    let ledger = Ledger::load(ledger_path)?;
+    let Some(last) = ledger.last_date else {
+        bail!("paper ledger is empty; run `scry paper` first")
+    };
+    let age = (Utc::now().date_naive() - last).num_days();
+    if age > 5 {
+        bail!(
+            "paper ledger is {age} days old (last date {last}); refusing to trade on stale signals"
+        );
+    }
+    let weights = live::blend(&ledger, &lc.strategies)?;
+    println!(
+        "mode: {:?} | mirroring {} | budget ${:.2}",
+        lc.mode,
+        lc.strategies.join(", "),
+        lc.budget
+    );
+    println!("target weights after next open:");
+    for (s, w) in weights.iter().filter(|(_, w)| **w > 0.0) {
+        println!("  {s:<6} {:>6.2}%", w * 100.0);
+    }
+
+    let broker = match Alpaca::from_env(lc.mode == Mode::Live) {
+        Ok(b) => b,
+        Err(e) if !execute => {
+            println!("\n({e:#}; showing targets only)");
+            return Ok(());
+        }
+        Err(e) => return Err(e),
+    };
+    let mut state = LiveState::load(state_path)?;
+    if let Some(why) = &state.halted {
+        println!(
+            "\nHALTED: {why}\nNo orders sent. Delete `halted` in {} to resume.",
+            state_path.display()
+        );
+        return Ok(());
+    }
+    let now = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    for line in state.reconcile(lc, &broker, &now)? {
+        println!("{line}");
+    }
+    let acct = broker.account()?;
+    if acct.blocked {
+        bail!("Alpaca reports the account is blocked from trading");
+    }
+    if broker.market_open()? {
+        println!(
+            "note: market is open now, so orders fill immediately rather than at the next open"
+        );
+    }
+    let positions = broker.positions()?;
+    let prices = ledger
+        .ref_close
+        .iter()
+        .map(|(s, (_, c))| (s.clone(), *c))
+        .collect();
+    let p = live::plan(
+        lc,
+        &weights,
+        &cfg.universe,
+        &positions,
+        &prices,
+        state.bot_cash,
+        acct.cash,
+    );
+    println!(
+        "\naccount equity ${:.2} | bot cash ${:.2} | managed value ${:.2}",
+        acct.equity, state.bot_cash, p.managed_value
+    );
+    for n in &p.notes {
+        println!("{n}");
+    }
+    if p.orders.is_empty() {
+        println!("no orders needed");
+    }
+    for o in &p.orders {
+        println!("  {o:?}");
+    }
+    if !execute {
+        println!("\ndry run: pass --execute to send these orders");
+        return Ok(());
+    }
+    let tag = Utc::now().format("%Y%m%d%H%M%S").to_string();
+    let fills = live::execute(&broker, &p, &tag)?;
+    if p.halted {
+        state.halted = Some(format!(
+            "{now}: managed value ${:.2} fell below ${:.2}",
+            p.managed_value, lc.halt_below
+        ));
+    }
+    let today = Utc::now().date_naive();
+    state.history.retain(|(d, _)| *d != today);
+    state
+        .history
+        .push((today, (p.managed_value * 100.0).round() / 100.0));
+    state.save(state_path)?;
+    let log = serde_json::json!({ "time": now, "mode": lc.mode, "strategies": lc.strategies, "plan": p, "results": fills });
+    let log_path = state_path.with_file_name("live_log.jsonl");
+    use std::io::Write;
+    writeln!(
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)?,
+        "{log}"
+    )?;
+    Ok(())
+}
+
+fn candidates(ledger: &Ledger, min_days: usize, top: usize) -> Result<()> {
+    use scrying_bull::metrics::compute;
+    use scrying_bull::strategies::baseline::RANDOM_PREFIX;
+    let mut rows: Vec<(String, scrying_bull::metrics::Metrics)> = ledger
+        .accounts
+        .iter()
+        .filter(|(_, a)| a.active && a.equity.len() > min_days)
+        .map(|(id, a)| (id.clone(), compute(&a.equity)))
+        .collect();
+    if rows.is_empty() {
+        let max = ledger
+            .accounts
+            .values()
+            .map(|a| a.equity.len().saturating_sub(1))
+            .max()
+            .unwrap_or(0);
+        println!("no strategy has {min_days}+ paper days yet (longest: {max}). Use --min-days to lower the bar, but short records are mostly noise.");
+        return Ok(());
+    }
+    let mut null: Vec<f64> = rows
+        .iter()
+        .filter(|(id, _)| id.starts_with(RANDOM_PREFIX))
+        .map(|r| r.1.sharpe)
+        .collect();
+    null.sort_by(f64::total_cmp);
+    rows.retain(|(id, _)| !id.starts_with(RANDOM_PREFIX));
+    rows.sort_by(|a, b| b.1.sharpe.total_cmp(&a.1.sharpe));
+    println!(
+        "{:<46} {:>5} {:>8} {:>7} {:>7} {:>7}",
+        "strategy (paper record)", "days", "return", "Sharpe", "MaxDD", ">rand"
+    );
+    for (id, m) in rows.iter().take(top) {
+        let beats =
+            null.iter().filter(|s| **s < m.sharpe).count() as f64 / null.len().max(1) as f64;
+        println!(
+            "{id:<46} {:>5} {:>7.2}% {:>7.2} {:>6.1}% {:>6.0}%",
+            m.days - 1,
+            m.total_return * 100.0,
+            m.sharpe,
+            m.max_drawdown * 100.0,
+            beats * 100.0
+        );
+    }
+    println!(
+        "\nA strategy that doesn't beat ~95% of the random baselines has not shown an edge yet."
+    );
     Ok(())
 }
