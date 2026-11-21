@@ -318,7 +318,7 @@ pub fn analyze(
     // 8. Universe robustness.
     let mut uni = Vec::new();
     for (label, p) in std::iter::once((format!("Default ({} symbols)", panel.symbols.len()), panel))
-        .chain(alt.map(|a| (format!("ETFs only ({} symbols)", a.symbols.len()), a)))
+        .chain(alt.map(|a| (format!("Alternate ({} symbols)", a.symbols.len()), a)))
     {
         for (series, sp) in [("Strategy", spec), ("Buy & hold", bench)] {
             let rr = run(sp, p, cfg, &costs);

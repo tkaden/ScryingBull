@@ -10,30 +10,31 @@ validation_start = "2021-01-01"
 # Starting capital for every backtest and every paper account.
 cash = 100000.0
 
-# A deliberately diverse universe: equity indices, sectors, bonds, commodities,
-# real estate, plus large single names. Yahoo tickers.
+# ETFs only: broad equity, sectors, bonds, commodities and real estate. No single
+# stocks picked with hindsight, so buy & hold isn't flattered by known winners.
 universe = [
-  # broad equity
   "SPY", "QQQ", "IWM", "DIA", "EFA", "EEM",
-  # sectors
   "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB",
-  # rates & credit
   "TLT", "IEF", "SHY", "LQD", "HYG",
-  # real assets
   "GLD", "SLV", "DBC", "USO", "VNQ",
-  # single names
-  "AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "JPM", "JNJ", "XOM",
-  "PG", "KO", "WMT", "HD", "UNH", "V", "BRK-B", "CAT", "COST",
 ]
 
-# `scry analyze` re-tests a strategy on this universe too. ETFs only: no
-# single stocks chosen with hindsight, so no survivorship bias from the list.
+# `scry analyze` re-tests a strategy on this universe too: the ETFs plus large
+# single stocks (chosen in 2026, so expect them to flatter stock-picking).
 robustness_universe = [
   "SPY", "QQQ", "IWM", "DIA", "EFA", "EEM",
   "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLU", "XLB",
   "TLT", "IEF", "SHY", "LQD", "HYG",
   "GLD", "SLV", "DBC", "USO", "VNQ",
+  "AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "JPM", "JNJ", "XOM",
+  "PG", "KO", "WMT", "HD", "UNH", "V", "BRK-B", "CAT", "COST",
 ]
+
+[value]
+# Single-stock value research: `scry value fetch`, then `scry value run`.
+universe_file = "config/value_universe.txt"
+data_start = "2008-06-01"
+refresh_days = 7
 
 [costs]
 commission_bps = 1.0  # per side, basis points of notional
@@ -45,7 +46,7 @@ min_trade = 0.005     # skip rebalances smaller than 0.5% of equity
 # `scry live` is a dry run; `--execute` sends orders; real money also needs `--real-money`.
 [live]
 mode = "paper"                          # "paper" (Alpaca paper account) or "live" (REAL MONEY)
-strategies = ["ensemble.family_vote"]   # paper-ledger ids to mirror; weights are averaged
+strategies = ["baseline.buy_hold"]      # the control. Switch only to a strategy whose PAPER record beats this
 budget = 500.0                          # dollars the bot may use; other cash is never touched
 halt_below = 400.0                      # kill switch: liquidate and stop if the bot's value falls below this
 min_order = 5.0                         # smallest order, dollars

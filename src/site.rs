@@ -14,6 +14,8 @@ use std::path::Path;
 const INDEX: &str = include_str!("../web/index.html");
 const APP: &str = include_str!("../web/app.js");
 const STYLE: &str = include_str!("../web/style.css");
+const VALUE_HTML: &str = include_str!("../web/value.html");
+const VALUE_JS: &str = include_str!("../web/value.js");
 
 /// Marker written next to the data cache recording where the data came from.
 pub const SOURCE_FILE: &str = "SOURCE";
@@ -99,4 +101,50 @@ pub fn build(out: &Path, cfg: &Config, results: &[BacktestResult], ledger: &Ledg
         serde_json::to_string(&summary)?,
     )?;
     Ok(())
+}
+
+/// Add the value-research page when `scry value run` has produced results.
+pub fn build_value(out: &Path, results: &Path, ledger: &Ledger) -> Result<bool> {
+    let Ok(screen) = std::fs::read_to_string(results.join("screen.json")) else {
+        return Ok(false);
+    };
+    let dir = out.join("data/value");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(out.join("value.html"), VALUE_HTML)?;
+    std::fs::write(out.join("value.js"), VALUE_JS)?;
+    std::fs::write(dir.join("screen.json"), screen)?;
+    for f in ["signals.json", "monthly.json"] {
+        std::fs::copy(results.join(f), dir.join(f))?;
+    }
+    let bt: Vec<BacktestResult> =
+        serde_json::from_str(&std::fs::read_to_string(results.join("backtest.json"))?)?;
+    let rows: Vec<Value> = bt
+        .iter()
+        .filter(|b| !b.id.starts_with(RANDOM_PREFIX))
+        .map(|b| {
+            let paper = ledger.accounts.get(&b.id).map(|a| {
+                let m = compute(&a.equity);
+                json!({"days": a.equity.len().saturating_sub(1), "ret": r4(m.total_return), "sharpe": r4(m.sharpe), "inception": a.inception})
+            });
+            json!({
+                "id": b.id, "description": b.description,
+                "train": {"cagr": r4(b.train.cagr), "sharpe": r4(b.train.sharpe), "mdd": r4(b.train.max_drawdown)},
+                "val": {"cagr": r4(b.validation.cagr), "sharpe": r4(b.validation.sharpe), "mdd": r4(b.validation.max_drawdown)},
+                "beats_random_val": r4(b.beats_random_validation), "turnover": r4(b.turnover),
+                "paper": paper,
+            })
+        })
+        .collect();
+    let random_sharpes: Vec<f64> = bt
+        .iter()
+        .filter(|b| b.id.starts_with(RANDOM_PREFIX))
+        .map(|b| b.validation.sharpe)
+        .collect();
+    std::fs::write(
+        dir.join("strategies.json"),
+        serde_json::to_string(
+            &json!({"generated": Utc::now().to_rfc3339(), "strategies": rows, "random_val_sharpe": random_sharpes}),
+        )?,
+    )?;
+    Ok(true)
 }

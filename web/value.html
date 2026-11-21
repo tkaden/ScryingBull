@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scrying Bull Value</title>
+<meta name="description" content="Which stocks are cheap, and has buying cheap stocks paid off? Measured month by month from SEC filings.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="wrap">
+  <h1>Scrying Bull</h1>
+  <p class="sub">Which stocks are cheap, and has buying cheap stocks actually paid off? Scored every month from SEC filings, using only what was public at the time.</p>
+  <nav class="nav"><a href="index.html">Strategies</a><a href="value.html" aria-current="page">Value stocks</a></nav>
+  <div id="tiles" class="tiles"></div>
+</header>
+
+<main class="wrap">
+  <section class="card">
+    <h2>Does cheapness predict returns?</h2>
+    <p class="note">Each month, every stock is ranked on each measure. The <em>information coefficient</em> (IC) is the rank correlation between that ranking and the next month's return: 0 means no information, and 0.05 is considered useful in practice. The t-stat says how unlikely that average is by chance; above about 2 is meaningful. The spread is how much the top fifth beat the bottom fifth per year, before trading costs.</p>
+    <div class="table-wrap">
+      <table id="signals">
+        <thead>
+          <tr><th class="l" rowspan="2">Signal</th><th colspan="3">Train 2010–2020</th><th colspan="3">Validation 2021–now</th></tr>
+          <tr><th>Mean IC</th><th>t-stat</th><th>Spread / yr</th><th>Mean IC</th><th>t-stat</th><th>Spread / yr</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Signal strength over time</h2>
+    <div class="signal-pick"><label for="signal">Signal</label><select id="signal"></select></div>
+    <p class="note">Bars: each month's IC. Line: the trailing 12-month average. Shaded: validation period.</p>
+    <div id="ic-chart" class="chart"></div>
+  </section>
+
+  <section class="card">
+    <h2>Growth of $1 by value quintile</h2>
+    <p class="note">Each month the scored stocks are split into fifths from cheapest (Q1) to most expensive (Q5), equal weight, held for a month. No trading costs. If value works, Q1 ends on top and the lines fan out in order.</p>
+    <div id="q-legend" class="legend"></div>
+    <div id="q-chart" class="chart"></div>
+  </section>
+
+  <section class="card">
+    <h2>Value portfolios</h2>
+    <p class="note">Tradable versions with costs, rebalanced monthly at the next open. Compare against <b>value.universe_equal</b> (every scored stock, equal weight): a value strategy that can't beat it adds nothing. Paper columns fill in as the daily job runs.</p>
+    <div class="table-wrap">
+      <table id="strategies">
+        <thead><tr>
+          <th class="l">Portfolio</th><th>Train Sharpe</th><th>Train CAGR</th><th>Val Sharpe</th><th>Val CAGR</th><th>Val max DD</th><th title="Share of random strategies with a lower validation Sharpe">Val beats random</th><th>Paper return</th><th>Paper days</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Today's cheapest stocks <span class="muted" id="screen-date"></span></h2>
+    <p class="note">Ranked by composite value: the average percentile of the five yields below, 100 = cheapest in the universe. The F-score (0–9) checks financial health: low scores flag possible value traps, cheap because the business is deteriorating. This is a starting point for research, not a buy list.</p>
+    <section class="filters" aria-label="Screen filters">
+      <label class="grow">Search <input id="q" type="search" placeholder="Ticker or company"></label>
+      <label>Show <select id="limit"><option value="50">Cheapest 50</option><option value="100">Cheapest 100</option><option value="100000">All</option></select></label>
+      <label class="check"><input id="healthy" type="checkbox"> Only F-score 6+</label>
+    </section>
+    <div class="table-wrap">
+      <table id="screen">
+        <thead><tr>
+          <th data-k="rank" class="l">#</th><th data-k="ticker" class="l">Ticker</th><th data-k="name" class="l">Company</th>
+          <th data-k="value_pct">Value</th><th data-k="earnings_yield">Earnings yield</th><th data-k="book_to_market">Book / price</th>
+          <th data-k="fcf_yield">FCF yield</th><th data-k="ebit_ev">EBIT / EV</th><th data-k="fscore">F-score</th>
+          <th data-k="momentum_12_1">12-1 mom.</th><th data-k="market_cap_bn">Mkt cap $bn</th><th class="l">Note</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <details class="method">
+      <summary>How the scores are built, and the limits</summary>
+      <dl>
+        <dt>Data</dt><dd>Annual income, cash-flow and revenue figures from 10-K filings, balance sheets and share counts from the latest 10-K or 10-Q, all from SEC EDGAR. A number is used only after its filing date. Prices from Yahoo Finance.</dd>
+        <dt>Earnings yield</dt><dd>Net income / market cap.</dd>
+        <dt>Book / price</dt><dd>Shareholders' equity / market cap.</dd>
+        <dt>Sales yield</dt><dd>Revenue / market cap.</dd>
+        <dt>FCF yield</dt><dd>(Operating cash flow − capital spending) / market cap.</dd>
+        <dt>EBIT / EV</dt><dd>Operating income / (market cap + long-term debt − cash). Banks and insurers often don't report it.</dd>
+        <dt>F-score</dt><dd>Nine yes/no tests from Piotroski (2000): profitable, cash-generative, improving return on assets, earnings backed by cash, falling leverage, rising liquidity, no dilution, rising gross margin, rising asset turnover.</dd>
+        <dt>Universe</dt><dd>The S&amp;P 500 as listed in 2021. Companies acquired or delisted since then mostly have no price history and drop out, so results still carry some survivorship bias.</dd>
+        <dt>Not handled</dt><dd>Sector concentration (cheap stocks cluster in a few industries), annual-report lag of up to 15 months for income figures, and taxes.</dd>
+      </dl>
+    </details>
+  </section>
+
+  <footer class="note"><p>Generated <span id="generated"></span>. Not investment advice.</p></footer>
+</main>
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<script src="value.js"></script>
+</body>
+</html>

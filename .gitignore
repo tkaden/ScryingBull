@@ -6,3 +6,4 @@
 *.json.tmp
 .DS_Store
 .idea/
+.sec_user_agent

@@ -26,6 +26,20 @@ struct Cli {
 }
 
 #[derive(Subcommand)]
+enum ValueCmd {
+    /// Download prices and SEC filings for the value universe.
+    Fetch,
+    /// Score every stock, backtest the value portfolios, measure the signals
+    /// over time, rank today's cheapest stocks and advance their paper ledger.
+    Run {
+        #[arg(long, default_value = "ledger/value_ledger.json")]
+        ledger: PathBuf,
+        #[arg(long, default_value = "results/value")]
+        out: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
 enum Cmd {
     /// Download daily bars for the universe from Yahoo Finance into the data cache.
     Fetch,
@@ -58,6 +72,11 @@ enum Cmd {
         ledger: PathBuf,
         #[arg(long, default_value = "site")]
         out: PathBuf,
+        /// Value research results (from `scry value run`), included when present.
+        #[arg(long, default_value = "results/value")]
+        value_results: PathBuf,
+        #[arg(long, default_value = "ledger/value_ledger.json")]
+        value_ledger: PathBuf,
     },
     /// Mirror the configured strategies into an Alpaca account. Dry run unless --execute.
     Live {
@@ -78,6 +97,11 @@ enum Cmd {
         id: String,
         #[arg(long, default_value = "results/analysis")]
         out: PathBuf,
+    },
+    /// Value-investing research on single stocks (SEC fundamentals).
+    Value {
+        #[command(subcommand)]
+        cmd: ValueCmd,
     },
     /// Rank strategies by their *paper* record, to choose what to trade live.
     Candidates {
@@ -121,11 +145,16 @@ fn main() -> Result<()> {
             backtest,
             ledger,
             out,
+            value_results,
+            value_ledger,
         } => {
             let results: Vec<BacktestResult> =
                 serde_json::from_str(&std::fs::read_to_string(&backtest)?)?;
             let ledger = Ledger::load(&ledger)?;
             site::build(&out, &cfg, &results, &ledger)?;
+            if site::build_value(&out, &value_results, &Ledger::load(&value_ledger)?)? {
+                println!("value page included");
+            }
             println!("site written to {}", out.display());
             Ok(())
         }
@@ -155,6 +184,7 @@ fn main() -> Result<()> {
                 &out.join(&id),
             )
         }
+        Cmd::Value { cmd } => run_value(&cfg, cmd),
         Cmd::Candidates {
             ledger,
             min_days,
@@ -167,6 +197,11 @@ fn main() -> Result<()> {
             write_json(Path::new("results/backtest.json"), &results)?;
             let l = run_paper(&cfg, &ledger)?;
             site::build(&out, &cfg, &results, &l)?;
+            site::build_value(
+                &out,
+                Path::new("results/value"),
+                &Ledger::load(Path::new("ledger/value_ledger.json"))?,
+            )?;
             println!("site written to {}", out.display());
             Ok(())
         }
@@ -185,14 +220,20 @@ fn filtered(filter: Option<&str>) -> Result<Vec<Spec>> {
 }
 
 fn fetch(cfg: &Config) -> Result<()> {
+    fetch_symbols(cfg, &cfg.universe)
+}
+
+/// Download prices (and split data) for `symbols` into the data cache.
+fn fetch_symbols(cfg: &Config, symbols: &[String]) -> Result<()> {
     let agent = ureq::AgentBuilder::new()
         .timeout(std::time::Duration::from_secs(30))
         .try_proxy_from_env(true)
         .build();
+    std::fs::create_dir_all(&cfg.data_dir)?;
     let mut failed = Vec::new();
-    for sym in &cfg.universe {
+    for sym in symbols {
         match yahoo::fetch(&agent, sym, cfg.data_start) {
-            Ok(s) if !s.bars.is_empty() => {
+            Ok((s, extras)) if !s.bars.is_empty() => {
                 println!(
                     "{sym:<6} {} bars, {} .. {}",
                     s.bars.len(),
@@ -200,6 +241,7 @@ fn fetch(cfg: &Config) -> Result<()> {
                     s.bars.last().unwrap().date
                 );
                 s.save(&cfg.data_dir)?;
+                extras.save(&cfg.data_dir, sym)?;
             }
             Ok(_) => failed.push(format!("{sym}: empty")),
             Err(e) => failed.push(format!("{e:#}")),
@@ -212,11 +254,11 @@ fn fetch(cfg: &Config) -> Result<()> {
     std::fs::create_dir_all(&cfg.data_dir)?;
     std::fs::write(cfg.data_dir.join(site::SOURCE_FILE), "yahoo")?;
     // Tolerate a few failures (cached data is kept), but not a total outage.
-    if failed.len() * 2 > cfg.universe.len() {
+    if failed.len() * 2 > symbols.len() {
         bail!(
             "{} of {} symbols failed to download",
             failed.len(),
-            cfg.universe.len()
+            symbols.len()
         );
     }
     Ok(())
@@ -491,4 +533,145 @@ fn candidates(ledger: &Ledger, min_days: usize, top: usize) -> Result<()> {
         "\nA strategy that doesn't beat ~95% of the random baselines has not shown an edge yet."
     );
     Ok(())
+}
+
+fn run_value(cfg: &Config, cmd: ValueCmd) -> Result<()> {
+    use scrying_bull::data::yahoo::Extras;
+    use scrying_bull::{fundamentals, value};
+    let Some(vc) = &cfg.value else {
+        bail!("no [value] section in the config")
+    };
+    let symbols = vc.symbols()?;
+    match cmd {
+        ValueCmd::Fetch => {
+            let mut c = cfg.clone();
+            c.data_start = vc.data_start;
+            fetch_symbols(&c, &symbols)?;
+            let sec = fundamentals::Sec::new(&cfg.data_dir)?;
+            let map = sec.tickers()?;
+            let (mut ok, mut missing) = (0, Vec::new());
+            for (k, sym) in symbols.iter().enumerate() {
+                let Some(cik) = map.get(sym) else {
+                    missing.push(format!("{sym}: no SEC filer (delisted or renamed)"));
+                    continue;
+                };
+                match sec.facts(sym, *cik, vc.refresh_days) {
+                    Ok(f) => {
+                        ok += 1;
+                        if k % 50 == 0 {
+                            println!(
+                                "[{k}/{}] {sym}: {} ({} fields)",
+                                symbols.len(),
+                                f.name,
+                                f.fields.len()
+                            );
+                        }
+                    }
+                    Err(e) => missing.push(format!("{sym}: {e:#}")),
+                }
+            }
+            for m in &missing {
+                eprintln!("warning: {m}");
+            }
+            println!(
+                "SEC filings: {ok} companies cached, {} missing",
+                missing.len()
+            );
+            Ok(())
+        }
+        ValueCmd::Run { ledger, out } => {
+            let panel = Panel::load(&cfg.data_dir, &symbols, vc.data_start)?;
+            let facts: Vec<_> = panel
+                .symbols
+                .iter()
+                .map(|s| fundamentals::load_cached(&cfg.data_dir, s))
+                .collect();
+            let extras: Vec<_> = panel
+                .symbols
+                .iter()
+                .map(|s| Extras::load(&cfg.data_dir, s))
+                .collect();
+            println!(
+                "value universe: {} of {} symbols have prices, {} have SEC filings",
+                panel.symbols.len(),
+                symbols.len(),
+                facts.iter().filter(|f| f.is_some()).count()
+            );
+            let t = Instant::now();
+            let table =
+                std::sync::Arc::new(value::build_table(&panel, &facts, &extras, cfg.eval_start));
+            let scored = |d: &NaiveDate| {
+                table.by_date[d]
+                    .iter()
+                    .filter(|s| s.as_ref().is_some_and(|s| s.value.is_some()))
+                    .count()
+            };
+            let first = table.rebalance.first().copied();
+            println!(
+                "scored {} month-ends in {:.1}s ({} stocks at {}, {} at the latest date)",
+                table.rebalance.len(),
+                t.elapsed().as_secs_f64(),
+                first.map_or(0, |d| scored(&d)),
+                first.map_or("-".into(), |d| d.to_string()),
+                table.by_date.keys().next_back().map_or(0, scored)
+            );
+            let (specs, results) = value::backtest(
+                &panel,
+                table.clone(),
+                &registry(),
+                cfg.eval_start,
+                cfg.validation_start,
+                cfg.cash,
+                &cfg.costs,
+            );
+            print_leaderboard(&results, 16);
+            let m = value::measure(&panel, &table, cfg.validation_start);
+            println!("\nsignal strength: mean monthly information coefficient (t-stat)");
+            for s in &m.signals {
+                println!(
+                    "  {:<22} {:<10} IC {:+.3} (t {:+.1}), hit {:.0}%, top-minus-bottom quintile {:+.1}%/yr",
+                    s["label"].as_str().unwrap_or(""),
+                    s["period"].as_str().unwrap_or(""),
+                    s["mean_ic"].as_f64().unwrap_or(0.0),
+                    s["ic_t_stat"].as_f64().unwrap_or(0.0),
+                    s["ic_hit_rate"].as_f64().unwrap_or(0.0) * 100.0,
+                    s["spread_per_year"].as_f64().unwrap_or(0.0) * 100.0
+                );
+            }
+            let (date, screen) = value::screen(&panel, &table, &facts);
+            std::fs::create_dir_all(&out)?;
+            write_json(&out.join("backtest.json"), &results)?;
+            write_json(&out.join("monthly.json"), &m.monthly)?;
+            write_json(&out.join("signals.json"), &m.signals)?;
+            write_json(
+                &out.join("screen.json"),
+                &serde_json::json!({"date": date, "rows": screen}),
+            )?;
+            println!("\ncheapest stocks as of {date}:");
+            for r in screen.iter().take(15) {
+                println!(
+                    "  {:>3}. {:<6} {:<34} value {:.2}  F-score {}  {}",
+                    r["rank"],
+                    r["ticker"].as_str().unwrap_or(""),
+                    r["name"]
+                        .as_str()
+                        .unwrap_or("")
+                        .chars()
+                        .take(34)
+                        .collect::<String>(),
+                    r["value_pct"].as_f64().unwrap_or(0.0),
+                    r["fscore"].as_u64().map_or("-".into(), |x| x.to_string()),
+                    r["flag"].as_str().unwrap_or("")
+                );
+            }
+            let mut l = Ledger::load(&ledger)?;
+            let rep = paper::advance(&mut l, &panel, &specs, cfg.cash, &cfg.costs);
+            println!(
+                "value paper ledger: {} new day(s), {} advanced, {} opened",
+                rep.new_days, rep.updated, rep.opened
+            );
+            l.save(&ledger)?;
+            Ok(())
+        }
+    }
 }
